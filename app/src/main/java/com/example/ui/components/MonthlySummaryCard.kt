@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -46,8 +47,12 @@ import com.example.ui.theme.CatKos
 import com.example.ui.theme.CatOthers
 import com.example.ui.theme.ExpenseRed
 import com.example.ui.theme.ExpenseRedBg
+import com.example.ui.theme.ExpenseRedDark
+import com.example.ui.theme.ExpenseRedDarkBg
 import com.example.ui.theme.IncomeGreen
 import com.example.ui.theme.IncomeGreenBg
+import com.example.ui.theme.IncomeGreenDark
+import com.example.ui.theme.IncomeGreenDarkBg
 import com.example.util.Formatters
 
 @Composable
@@ -61,6 +66,12 @@ fun MonthlySummaryCard(
     onNextMonth: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isDark = isSystemInDarkTheme()
+    val incomeCardBg = if (isDark) IncomeGreenDarkBg else IncomeGreenBg
+    val incomeTextColor = if (isDark) IncomeGreenDark else IncomeGreen
+    val expenseCardBg = if (isDark) ExpenseRedDarkBg else ExpenseRedBg
+    val expenseTextColor = if (isDark) ExpenseRedDark else ExpenseRed
+
     val animatedIncome by animateFloatAsState(
         targetValue = income.toFloat(),
         animationSpec = spring(stiffness = Spring.StiffnessLow),
@@ -92,19 +103,12 @@ fun MonthlySummaryCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = "Ringkasan",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Arus kas bulan ini (terhitung otomatis)",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = "Ringkasan",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -167,7 +171,7 @@ fun MonthlySummaryCard(
             ) {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = IncomeGreenBg,
+                    color = incomeCardBg,
                     modifier = Modifier.weight(1f)
                 ) {
                     Column(
@@ -176,28 +180,22 @@ fun MonthlySummaryCard(
                         Text(
                             text = "Pemasukan",
                             style = MaterialTheme.typography.labelSmall,
-                            color = IncomeGreen,
+                            color = incomeTextColor,
                             fontWeight = FontWeight.Bold
                         )
-                        Text(
-                            text = "Gaji, transfer masuk",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = IncomeGreen.copy(alpha = 0.7f),
-                            fontSize = 10.sp
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = Formatters.formatRupiah(animatedIncome.toLong()),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = IncomeGreen
+                            color = incomeTextColor
                         )
                     }
                 }
 
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = ExpenseRedBg,
+                    color = expenseCardBg,
                     modifier = Modifier.weight(1f)
                 ) {
                     Column(
@@ -206,21 +204,15 @@ fun MonthlySummaryCard(
                         Text(
                             text = "Pengeluaran",
                             style = MaterialTheme.typography.labelSmall,
-                            color = ExpenseRed,
+                            color = expenseTextColor,
                             fontWeight = FontWeight.Bold
                         )
-                        Text(
-                            text = "Makan, kos, belanja",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = ExpenseRed.copy(alpha = 0.7f),
-                            fontSize = 10.sp
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = Formatters.formatRupiah(animatedExpense.toLong()),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = ExpenseRed
+                            color = expenseTextColor
                         )
                     }
                 }

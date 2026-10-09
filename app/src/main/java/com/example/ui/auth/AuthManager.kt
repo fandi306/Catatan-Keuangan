@@ -23,6 +23,17 @@ import kotlinx.coroutines.tasks.await
 object AuthManager {
     private const val TAG = "AuthManager"
 
+    private fun getWebClientId(context: Context): String? {
+        val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+        if (resId != 0) {
+            val value = context.getString(resId)
+            if (value.isNotBlank() && value != "default_web_client_id") {
+                return value
+            }
+        }
+        return null
+    }
+
     fun attemptAutoSignIn(
         context: Context,
         credentialManager: CredentialManager,
@@ -30,14 +41,13 @@ object AuthManager {
         onUnauthenticated: () -> Unit,
         scope: CoroutineScope
     ) {
-        if (Firebase.auth.currentUser != null) {
+        val currentUser = try { Firebase.auth.currentUser } catch (_: Exception) { null }
+        if (currentUser != null) {
             onAuthSuccess()
             return
         }
-        val clientId = try {
-            context.getString(R.string.default_web_client_id)
-        } catch (e: Exception) {
-            Log.w(TAG, "default_web_client_id not found", e)
+        val clientId = getWebClientId(context) ?: run {
+            Log.w(TAG, "default_web_client_id not found")
             onUnauthenticated()
             return
         }
@@ -76,10 +86,8 @@ object AuthManager {
         scope: CoroutineScope,
         onAuthCancelled: () -> Unit = {}
     ) {
-        val clientId = try {
-            context.getString(R.string.default_web_client_id)
-        } catch (e: Exception) {
-            onAuthError("Google Sign-In configuration missing: default_web_client_id not found")
+        val clientId = getWebClientId(context) ?: run {
+            onAuthError("Google Sign-In configuration missing: default_web_client_id not found. Pastikan google-services.json telah dikonfigurasi.")
             return
         }
 
@@ -118,7 +126,9 @@ object AuthManager {
         onSignOutComplete: () -> Unit,
         scope: CoroutineScope
     ) {
-        Firebase.auth.signOut()
+        try {
+            Firebase.auth.signOut()
+        } catch (_: Exception) {}
         scope.launch {
             try {
                 credentialManager.clearCredentialState(ClearCredentialStateRequest())

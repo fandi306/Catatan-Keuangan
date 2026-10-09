@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,9 +36,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.model.Account
+import com.example.ui.theme.GoldTarget
 import com.example.ui.theme.NavyHero
+import com.example.ui.theme.NavyHeroDark
 import com.example.util.Formatters
 
 @Composable
@@ -48,6 +52,10 @@ fun AccountManagementDialog(
     onAddAccount: (name: String, type: String) -> Unit,
     onDeleteAccount: (String) -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
+    val primaryButtonBg = if (isDark) GoldTarget else NavyHero
+    val primaryButtonContent = if (isDark) NavyHeroDark else Color.White
+
     var newAccountName by remember { mutableStateOf("") }
     var newAccountType by remember { mutableStateOf("liquid") } // "liquid" or "non_liquid"
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -80,41 +88,41 @@ fun AccountManagementDialog(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    items(accounts) { acc ->
-                        val bal = balances[acc.name] ?: 0L
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                if (accounts.isNotEmpty()) {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(accounts) { acc ->
+                            val bal = balances[acc.name] ?: 0L
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = acc.name,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = if (acc.isLiquid) "Aset Lancar · ${Formatters.formatRupiah(bal)}" else "Aset Tidak Lancar · ${Formatters.formatRupiah(bal)}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = acc.name,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = if (acc.isLiquid) "Liquid Asset (Aset Lancar) · ${Formatters.formatRupiah(bal)}" else "Non-Liquid Asset (Aset Tdk Lancar) · ${Formatters.formatRupiah(bal)}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
 
-                                if (accounts.size > 1) {
                                     IconButton(
                                         onClick = { onDeleteAccount(acc.id) },
                                         modifier = Modifier.testTag("delete_acc_${acc.id}")
@@ -128,6 +136,21 @@ fun AccountManagementDialog(
                                 }
                             }
                         }
+                    }
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "Belum ada akun dompet tersimpan. Masukkan nama dompet di bawah (misal: Tunai, BRI, GoPay) untuk menambah akun pertama.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(12.dp)
+                        )
                     }
                 }
 
@@ -162,7 +185,7 @@ fun AccountManagementDialog(
                         onClick = { newAccountType = "liquid" },
                         shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
                     ) {
-                        Text("Aset Lancar")
+                        Text("Liquid (Lancar)", fontSize = 12.sp)
                     }
 
                     SegmentedButton(
@@ -170,16 +193,9 @@ fun AccountManagementDialog(
                         onClick = { newAccountType = "non_liquid" },
                         shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                     ) {
-                        Text("Aset Tidak Lancar")
+                        Text("Non-Liquid (Tdk Lancar)", fontSize = 12.sp)
                     }
                 }
-
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = if (newAccountType == "liquid") "• Aset Lancar: Rekening bank, e-wallet, uang tunai kas" else "• Aset Tidak Lancar: Gadget, investasi, barang berharga fisik",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
 
                 if (errorMessage != null) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -221,8 +237,8 @@ fun AccountManagementDialog(
                         },
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = NavyHero,
-                            contentColor = Color.White
+                            containerColor = primaryButtonBg,
+                            contentColor = primaryButtonContent
                         ),
                         modifier = Modifier.weight(1.5f)
                     ) {

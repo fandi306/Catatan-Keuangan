@@ -21,13 +21,26 @@ import kotlinx.coroutines.tasks.await
 
 class FinanceRepository(private val db: FirebaseFirestore) {
 
-    constructor(context: Context) : this(
-        FirebaseFirestore.getInstance(
-            context.applicationContext.getString(R.string.firestore_database_id)
-        )
-    )
+    constructor(context: Context) : this(provideFirestore(context))
 
-    private val auth = Firebase.auth
+    private val auth by lazy { Firebase.auth }
+
+    companion object {
+        private fun provideFirestore(context: Context): FirebaseFirestore {
+            com.example.CatatanKeuanganApp.initFirebase(context)
+            val resId = context.applicationContext.resources.getIdentifier("firestore_database_id", "string", context.packageName)
+            val dbId = if (resId != 0) context.applicationContext.getString(resId) else null
+            return if (dbId != null && dbId.isNotBlank()) {
+                try {
+                    FirebaseFirestore.getInstance(dbId)
+                } catch (_: Exception) {
+                    FirebaseFirestore.getInstance()
+                }
+            } else {
+                FirebaseFirestore.getInstance()
+            }
+        }
+    }
 
     private fun requireUserId(): String {
         return auth.currentUser?.uid
@@ -78,11 +91,15 @@ class FinanceRepository(private val db: FirebaseFirestore) {
         val uid = requireUserId()
         val path = "users/$uid"
         val docRef = db.collection("users").document(uid)
+        val existing = try { docRef.get().await() } catch (_: Exception) { null }
         val payload = hashMapOf<String, Any>(
             "userId" to uid,
             "photoUri" to photoUri,
             "updatedAt" to FieldValue.serverTimestamp()
         )
+        if (existing == null || !existing.exists() || existing.getLong("savingsTarget") == null) {
+            payload["savingsTarget"] = 0L
+        }
         try {
             docRef.set(payload, SetOptions.merge()).await()
         } catch (e: Exception) {
@@ -239,7 +256,12 @@ class FinanceRepository(private val db: FirebaseFirestore) {
         batch.commit().await()
     }
 
-    suspend fun seedInitialDataIfEmpty(userId: String, displayName: String = "", email: String = "") {
+    suspend fun seedInitialDataIfEmpty(
+        userId: String,
+        displayName: String = "",
+        email: String = "",
+        photoUri: String = ""
+    ) {
         val uid = requireUserId()
         val profileDoc = db.collection("users").document(uid).get().await()
         if (!profileDoc.exists()) {
@@ -247,12 +269,24 @@ class FinanceRepository(private val db: FirebaseFirestore) {
                 "userId" to uid,
                 "displayName" to displayName,
                 "email" to email,
+                "photoUri" to photoUri,
                 "savingsTarget" to 0L,
                 "updatedAt" to FieldValue.serverTimestamp()
             )
             db.collection("users").document(uid).set(userProfile).await()
+        } else if (photoUri.isNotBlank()) {
+            val currentPhoto = profileDoc.getString("photoUri") ?: ""
+            if (currentPhoto.isBlank()) {
+                db.collection("users").document(uid)
+                    .update("photoUri", photoUri, "updatedAt", FieldValue.serverTimestamp())
+                    .await()
+            }
         }
+        // Akun/dompet tidak diisi otomatis agar pengguna baru mulai dari nol dan membuat dompet sendiri
+    }
 
+    suspend fun seedSampleAccountsIfEmpty(userId: String) {
+        val uid = requireUserId()
         val accSnap = db.collection("users").document(uid).collection("accounts").get().await()
         if (accSnap.isEmpty) {
             val initialAccounts = listOf(
@@ -279,12 +313,11 @@ class FinanceRepository(private val db: FirebaseFirestore) {
             }
             batch.commit().await()
         }
-
-        // No transactions are seeded by default so new user starts with 0!
     }
 
     suspend fun populateSampleData(userId: String) {
         val uid = requireUserId()
+        seedSampleAccountsIfEmpty(userId)
         val dateStr = Formatters.currentIsoDate()
         val sampleTx = listOf(
             Transaction(id = "sample_1", userId = uid, type = "in", description = "Gaji Bulanan", amount = 5_000_000L, account = "BRI", date = dateStr),

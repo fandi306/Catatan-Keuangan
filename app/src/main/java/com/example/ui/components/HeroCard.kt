@@ -37,6 +37,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.isSystemInDarkTheme
+import com.example.ui.theme.NavySurfaceDark
 import com.example.ui.theme.GoldTarget
 import com.example.ui.theme.NavyHero
 import com.example.util.Formatters
@@ -52,6 +54,7 @@ fun HeroCard(
     onViewAnalyticsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val isDark = isSystemInDarkTheme()
     val animatedProgress by animateFloatAsState(
         targetValue = (targetProgressPct / 100f).coerceIn(0f, 1f),
         animationSpec = spring(stiffness = Spring.StiffnessLow),
@@ -82,7 +85,7 @@ fun HeroCard(
             .testTag("hero_total_asset_card"),
         shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(
-            containerColor = NavyHero
+            containerColor = if (isDark) NavySurfaceDark else NavyHero
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -94,20 +97,12 @@ fun HeroCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = "Total aset",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFB9C2E0)
-                    )
-                    Text(
-                        text = "Akumulasi saldo akun & simpanan Anda",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF8E9BBF),
-                        fontSize = 11.sp
-                    )
-                }
+                Text(
+                    text = "Total aset",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFFB9C2E0)
+                )
 
                 Surface(
                     shape = RoundedCornerShape(99.dp),
@@ -286,15 +281,15 @@ fun HeroCard(
                 ) {
                     Column {
                         Text(
-                            text = "Aset lancar",
+                            text = "Aset Lancar / Liquid Asset",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFB9C2E0),
+                            color = Color(0xFFD6DCFC),
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Kas, bank, e-wallet",
+                            text = "(Cash, tabungan, e-wallet, dll.)",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF8E9BBF),
+                            color = Color(0xFFA5B2E6),
                             fontSize = 10.sp
                         )
                         Spacer(modifier = Modifier.height(4.dp))
@@ -316,15 +311,15 @@ fun HeroCard(
                 ) {
                     Column {
                         Text(
-                            text = "Aset tidak lancar",
+                            text = "Aset Tdk Lancar / Non-Liquid",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFB9C2E0),
+                            color = Color(0xFFD6DCFC),
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Investasi, aset fisik",
+                            text = "(Handphone, emas, aset, dll.)",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF8E9BBF),
+                            color = Color(0xFFA5B2E6),
                             fontSize = 10.sp
                         )
                         Spacer(modifier = Modifier.height(4.dp))

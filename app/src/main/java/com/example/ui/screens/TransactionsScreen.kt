@@ -53,10 +53,13 @@ import com.example.ui.theme.NavyHero
 import com.example.ui.viewmodel.FinanceViewModel
 import com.example.util.Formatters
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import com.example.ui.theme.GoldTarget
+import com.example.ui.theme.NavyHeroDark
 
 @Composable
 fun TransactionsScreen(
@@ -199,6 +202,10 @@ fun TransactionsScreen(
         Spacer(modifier = Modifier.height(10.dp))
 
         // Filter chips
+        val isDark = isSystemInDarkTheme()
+        val chipSelectedBg = if (isDark) GoldTarget else NavyHero
+        val chipSelectedContent = if (isDark) NavyHeroDark else Color.White
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -209,8 +216,8 @@ fun TransactionsScreen(
                 label = { Text("Semua") },
                 shape = RoundedCornerShape(99.dp),
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = NavyHero,
-                    selectedLabelColor = Color.White
+                    selectedContainerColor = chipSelectedBg,
+                    selectedLabelColor = chipSelectedContent
                 )
             )
             FilterChip(
@@ -219,8 +226,8 @@ fun TransactionsScreen(
                 label = { Text("Pengeluaran") },
                 shape = RoundedCornerShape(99.dp),
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = NavyHero,
-                    selectedLabelColor = Color.White
+                    selectedContainerColor = chipSelectedBg,
+                    selectedLabelColor = chipSelectedContent
                 )
             )
             FilterChip(
@@ -229,8 +236,8 @@ fun TransactionsScreen(
                 label = { Text("Pemasukan") },
                 shape = RoundedCornerShape(99.dp),
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = NavyHero,
-                    selectedLabelColor = Color.White
+                    selectedContainerColor = chipSelectedBg,
+                    selectedLabelColor = chipSelectedContent
                 )
             )
         }
@@ -320,7 +327,10 @@ fun TransactionsScreen(
                         Button(
                             onClick = onAddNewTransaction,
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = NavyHero)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isDark) GoldTarget else NavyHero,
+                                contentColor = if (isDark) NavyHeroDark else Color.White
+                            )
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Add,

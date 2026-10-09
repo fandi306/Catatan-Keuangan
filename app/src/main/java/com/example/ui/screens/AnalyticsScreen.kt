@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -49,10 +50,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.OjkBudgetFormulaCard
+import com.example.ui.components.RotatableFinancialQuoteCard
 import com.example.ui.theme.ExpenseRed
 import com.example.ui.theme.GoldTarget
 import com.example.ui.theme.IncomeGreen
 import com.example.ui.theme.NavyHero
+import com.example.ui.theme.NavySurfaceDark
 import com.example.ui.viewmodel.FinanceViewModel
 import com.example.util.Formatters
 
@@ -71,6 +75,7 @@ fun AnalyticsScreen(
     val monthlyExpense by viewModel.monthlyExpense.collectAsState()
     val monthlyNet by viewModel.monthlyNet.collectAsState()
     val categoryBreakdown by viewModel.categoryBreakdown.collectAsState()
+    val financialAdvice by viewModel.financialAdvice.collectAsState()
 
     val animatedProgress by animateFloatAsState(
         targetValue = (targetProgressPct / 100f).coerceIn(0f, 1f),
@@ -137,9 +142,10 @@ fun AnalyticsScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
         // Big Target Achievement Card with Circular Gauge & Metrics
+        val isDark = isSystemInDarkTheme()
         Card(
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = NavyHero),
+            colors = CardDefaults.cardColors(containerColor = if (isDark) NavySurfaceDark else NavyHero),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(22.dp)) {
@@ -381,11 +387,19 @@ fun AnalyticsScreen(
                                 .background(IncomeGreen)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Aset Lancar (${liquidPct.toInt()}%)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        Column {
+                            Text(
+                                text = "Liquid Asset (${liquidPct.toInt()}%)",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Cash, tabungan, dompet digital, dll.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                     Text(
                         text = Formatters.formatRupiah(liquidAsset),
@@ -395,11 +409,12 @@ fun AnalyticsScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
@@ -409,11 +424,19 @@ fun AnalyticsScreen(
                                 .background(Color(0xFF4F7CFF))
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Aset Tidak Lancar (${nonLiquidPct.toInt()}%)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        Column {
+                            Text(
+                                text = "Non-Liquid Asset (${nonLiquidPct.toInt()}%)",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Handphone, emas, barang berharga, aset fisik, dll.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                     Text(
                         text = Formatters.formatRupiah(nonLiquidAsset),
@@ -494,6 +517,38 @@ fun AnalyticsScreen(
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Tips & Panduan Anggaran Rumus OJK 40-30-20-10
+        Text(
+            text = "Tips & Panduan Anggaran OJK",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        OjkBudgetFormulaCard(
+            tips = financialAdvice.ojkBudgetTips
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Kutipan Finansial Dinamis (Hourly / Daily)
+        Text(
+            text = "Kutipan Finansial Pengingat",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        RotatableFinancialQuoteCard(
+            advice = financialAdvice
+        )
 
         Spacer(modifier = Modifier.height(70.dp))
     }

@@ -21,13 +21,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.DocumentScanner
+import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.RestartAlt
@@ -65,12 +69,18 @@ import com.example.ui.components.AccountManagementDialog
 import com.example.ui.components.EditTargetDialog
 import com.example.ui.components.HeroCard
 import com.example.ui.components.MonthlySummaryCard
+import com.example.ui.components.RotatableFinancialQuoteCard
+import com.example.ui.components.ScanReceiptDialog
 import com.example.ui.components.TransactionItem
+import com.example.ui.components.WarningBannersSection
 import com.example.ui.theme.GoldTarget
 import com.example.ui.theme.IncomeGreen
 import com.example.ui.theme.NavyHero
+import com.example.ui.theme.NavyHeroDark
+import com.example.ui.theme.NavySurfaceDark
 import com.example.ui.viewmodel.FinanceViewModel
 import com.example.util.Formatters
+import com.example.util.ProfilePhotoHelper
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import java.util.Calendar
@@ -97,21 +107,23 @@ fun HomeScreen(
     val monthlyExpense by viewModel.monthlyExpense.collectAsState()
     val monthlyNet by viewModel.monthlyNet.collectAsState()
     val categoryBreakdown by viewModel.categoryBreakdown.collectAsState()
+    val financialAdvice by viewModel.financialAdvice.collectAsState()
 
     val displayedTransactions by viewModel.displayedTransactions.collectAsState()
     val allTransactions by viewModel.transactions.collectAsState()
 
     val userProfile by viewModel.userProfile.collectAsState()
-    val currentUser = Firebase.auth.currentUser
+    val currentUser = try { Firebase.auth.currentUser } catch (_: Exception) { null }
 
     var showEditTargetDialog by remember { mutableStateOf(false) }
     var showManageAccountsDialog by remember { mutableStateOf(false) }
+    var showScanReceiptDialog by remember { mutableStateOf(false) }
 
     val rawName = userProfile?.displayName?.ifBlank { null }
         ?: currentUser?.displayName?.ifBlank { null }
         ?: "Fandi"
     val firstName = rawName.trim().split(" ").firstOrNull()?.ifBlank { "Fandi" } ?: "Fandi"
-    val photoUri = userProfile?.photoUri?.ifBlank { null }
+    val photoUri = userProfile?.photoUri?.ifBlank { null } ?: currentUser?.photoUrl?.toString()
 
     // Responsive: Centered fluid layout up to 720.dp so tablet portrait and phones look natural and comfortable
     Box(
@@ -145,8 +157,64 @@ fun HomeScreen(
                 )
             }
 
-            // Onboarding Guide for new users (if transactions are 0)
-            if (allTransactions.isEmpty()) {
+            // Guide for new users when wallets/accounts are empty
+            if (accounts.isEmpty()) {
+                item {
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = CardDefaults.outlinedCardBorder(),
+                        modifier = Modifier.fillMaxWidth().testTag("empty_accounts_banner")
+                    ) {
+                        Column(modifier = Modifier.padding(18.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = GoldTarget.copy(alpha = 0.15f),
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.AccountBalanceWallet,
+                                            contentDescription = null,
+                                            tint = if (isSystemInDarkTheme()) GoldTarget else NavyHero,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "Buat Dompet Pertama Anda",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Anda belum memiliki akun atau dompet (seperti Tunai, Rekening, E-Wallet). Buat dompet dulu sebelum mencatat transaksi.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Button(
+                                onClick = { showManageAccountsDialog = true },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isSystemInDarkTheme()) GoldTarget else NavyHero,
+                                    contentColor = if (isSystemInDarkTheme()) NavyHeroDark else Color.White
+                                ),
+                                modifier = Modifier.fillMaxWidth().height(44.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Buat Dompet Sekarang", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            } else if (allTransactions.isEmpty()) {
                 item {
                     NewUserGuidanceCard(
                         onAddTransactionClick = onAddNewTransaction,
@@ -173,6 +241,88 @@ fun HomeScreen(
                     onPrevMonth = { viewModel.changeMonth(-1) },
                     onNextMonth = { viewModel.changeMonth(1) }
                 )
+            }
+
+            // Kutipan Finansial Dinamis (Berubah Tiap Jam / Hari)
+            item {
+                RotatableFinancialQuoteCard(
+                    advice = financialAdvice
+                )
+            }
+
+            if (financialAdvice.warnings.isNotEmpty()) {
+                item {
+                    WarningBannersSection(
+                        warnings = financialAdvice.warnings
+                    )
+                }
+            }
+
+            // Quick Scan Receipt Banner
+            item {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = CardDefaults.outlinedCardBorder(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showScanReceiptDialog = true }
+                        .testTag("banner_scan_receipt")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = GoldTarget.copy(alpha = 0.18f),
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.DocumentScanner,
+                                        contentDescription = null,
+                                        tint = if (isSystemInDarkTheme()) GoldTarget else NavyHero,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Scan Nota Otomatis",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Foto struk belanja jadi pengeluaran",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = { showScanReceiptDialog = true },
+                            shape = RoundedCornerShape(99.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isSystemInDarkTheme()) GoldTarget else NavyHero,
+                                contentColor = if (isSystemInDarkTheme()) NavyHeroDark else Color.White
+                            ),
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Text("Scan", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
 
             item {
@@ -210,6 +360,17 @@ fun HomeScreen(
             },
             onDeleteAccount = { accId ->
                 viewModel.deleteAccount(accId)
+            }
+        )
+    }
+
+    if (showScanReceiptDialog) {
+        ScanReceiptDialog(
+            accounts = accounts,
+            onDismiss = { showScanReceiptDialog = false },
+            onConfirmExpense = { desc, amount, account, category, date ->
+                viewModel.addTransaction("out", desc, amount, account, category, date)
+                showScanReceiptDialog = false
             }
         )
     }
@@ -292,7 +453,10 @@ private fun NewUserGuidanceCard(
                 Button(
                     onClick = onAddTransactionClick,
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = NavyHero),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSystemInDarkTheme()) GoldTarget else NavyHero,
+                        contentColor = if (isSystemInDarkTheme()) NavyHeroDark else Color.White
+                    ),
                     modifier = Modifier.weight(1.3f)
                 ) {
                     Icon(
@@ -301,7 +465,7 @@ private fun NewUserGuidanceCard(
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Catat Sekarang", fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Catat Sekarang", fontWeight = FontWeight.Bold)
                 }
 
                 OutlinedButton(
@@ -328,16 +492,17 @@ private fun GuidanceStep(
     title: String,
     description: String
 ) {
+    val isDark = isSystemInDarkTheme()
     Row(verticalAlignment = Alignment.Top) {
         Surface(
             shape = CircleShape,
-            color = NavyHero,
+            color = if (isDark) GoldTarget else NavyHero,
             modifier = Modifier.size(22.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
                     text = step,
-                    color = Color.White,
+                    color = if (isDark) NavyHeroDark else Color.White,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold
                 )
@@ -445,9 +610,13 @@ private fun LineBankStyleHeader(
                     }
                 }
 
+                val isDark = isSystemInDarkTheme()
+                val presetEmoji = ProfilePhotoHelper.getPresetEmoji(photoUri)
+                val resolvedModel = ProfilePhotoHelper.resolveImageModel(photoUri)
+
                 Surface(
                     shape = CircleShape,
-                    color = NavyHero,
+                    color = if (isDark) NavySurfaceDark else NavyHero,
                     modifier = Modifier
                         .size(38.dp)
                         .clip(CircleShape)
@@ -456,9 +625,14 @@ private fun LineBankStyleHeader(
                         .testTag("profile_avatar_button")
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        if (photoUri != null && photoUri.isNotBlank()) {
+                        if (!presetEmoji.isNullOrBlank()) {
+                            Text(
+                                text = presetEmoji,
+                                fontSize = 20.sp
+                            )
+                        } else if (resolvedModel != null) {
                             AsyncImage(
-                                model = photoUri,
+                                model = resolvedModel,
                                 contentDescription = "Foto Profil",
                                 modifier = Modifier
                                     .fillMaxSize()

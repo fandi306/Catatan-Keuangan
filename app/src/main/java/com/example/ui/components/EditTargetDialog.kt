@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,7 +29,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.example.ui.theme.GoldTarget
 import com.example.ui.theme.NavyHero
+import com.example.ui.theme.NavyHeroDark
 import com.example.util.Formatters
 
 @Composable
@@ -37,6 +40,10 @@ fun EditTargetDialog(
     onDismiss: () -> Unit,
     onSave: (Long) -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
+    val primaryButtonBg = if (isDark) GoldTarget else NavyHero
+    val primaryButtonContent = if (isDark) NavyHeroDark else Color.White
+
     var rawInput by remember { mutableStateOf(Formatters.formatNumber(currentTarget)) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -54,11 +61,6 @@ fun EditTargetDialog(
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Target membantu mengukur progres keuangan. Persentase capaian di beranda otomatis naik saat aset Anda bertambah.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -83,9 +85,6 @@ fun EditTargetDialog(
                         }
                     },
                     placeholder = { Text("Contoh: 50.000.000") },
-                    supportingText = {
-                        Text("Ketik angka nominal target yang ingin dicapai.")
-                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -128,8 +127,8 @@ fun EditTargetDialog(
                         },
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = NavyHero,
-                            contentColor = Color.White
+                            containerColor = primaryButtonBg,
+                            contentColor = primaryButtonContent
                         ),
                         modifier = Modifier.weight(1f)
                     ) {

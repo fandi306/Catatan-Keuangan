@@ -6,9 +6,15 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,12 +43,17 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.SwitchAccount
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.SentimentSatisfiedAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -52,6 +63,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -81,8 +96,13 @@ import com.example.ui.theme.ExpenseRed
 import com.example.ui.theme.GoldTarget
 import com.example.ui.theme.IncomeGreen
 import com.example.ui.theme.NavyHero
+import com.example.ui.theme.NavyHeroDark
+import com.example.ui.theme.NavySurfaceDark
 import com.example.ui.viewmodel.FinanceViewModel
+import com.example.util.AppPreferences
+import com.example.util.AppThemeMode
 import com.example.util.Formatters
+import com.example.util.ProfilePhotoHelper
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 
@@ -100,7 +120,7 @@ fun ProfileScreen(
     val coroutineScope = rememberCoroutineScope()
     val credentialManager = remember { CredentialManager.create(context) }
 
-    val user = Firebase.auth.currentUser
+    val user = try { Firebase.auth.currentUser } catch (_: Exception) { null }
     val userProfile by viewModel.userProfile.collectAsState()
     val savingsTarget by viewModel.savingsTarget.collectAsState()
     val accounts by viewModel.accounts.collectAsState()
@@ -110,12 +130,26 @@ fun ProfileScreen(
     var showManageAccountsDialog by remember { mutableStateOf(false) }
     var showResetConfirmationDialog by remember { mutableStateOf(false) }
     var showRestoreSeedConfirmationDialog by remember { mutableStateOf(false) }
+    var showLogoutConfirmationDialog by remember { mutableStateOf(false) }
+    var showSwitchAccountConfirmationDialog by remember { mutableStateOf(false) }
+    var showCreatorDialog by remember { mutableStateOf(false) }
+    var showEditProfileDialog by remember { mutableStateOf(false) }
+    var showCustomEmojiDialog by remember { mutableStateOf(false) }
+
+    val appPreferences = remember { AppPreferences.getInstance(context) }
+    val themeMode by appPreferences.themeMode.collectAsState()
+
+    val isDark = when (themeMode) {
+        AppThemeMode.SYSTEM -> isSystemInDarkTheme()
+        AppThemeMode.LIGHT -> false
+        AppThemeMode.DARK -> true
+    }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
-            viewModel.updateProfilePhoto(uri.toString())
+            viewModel.uploadProfilePhoto(context, uri)
         }
     }
 
@@ -125,7 +159,9 @@ fun ProfileScreen(
     val email = userProfile?.email?.ifBlank { null }
         ?: user?.email?.ifBlank { null }
         ?: "fandiahmad306@gmail.com"
-    val photoUri = userProfile?.photoUri?.ifBlank { null }
+    val rawPhotoUri = userProfile?.photoUri?.ifBlank { null } ?: user?.photoUrl?.toString()
+    val displayPhotoModel = ProfilePhotoHelper.resolveImageModel(rawPhotoUri)
+    val presetEmoji = ProfilePhotoHelper.getPresetEmoji(rawPhotoUri)
 
     Box(
         modifier = Modifier
@@ -167,7 +203,7 @@ fun ProfileScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Profile Card with Photo Change & Delete options
+        // Profile Card with Photo Sync, Preset Avatars, & Gallery Picker
         Card(
             shape = RoundedCornerShape(22.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -182,15 +218,20 @@ fun ProfileScreen(
                     ) {
                         Surface(
                             shape = CircleShape,
-                            color = NavyHero,
+                            color = if (isDark) NavySurfaceDark else NavyHero,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .border(2.dp, GoldTarget, CircleShape)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                if (photoUri != null && photoUri.isNotBlank()) {
+                                if (presetEmoji != null) {
+                                    Text(
+                                        text = presetEmoji,
+                                        fontSize = 38.sp
+                                    )
+                                } else if (displayPhotoModel != null) {
                                     AsyncImage(
-                                        model = photoUri,
+                                        model = displayPhotoModel,
                                         contentDescription = "Foto Profil",
                                         modifier = Modifier
                                             .fillMaxSize()
@@ -212,22 +253,43 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.width(16.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = displayName,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = displayName,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            IconButton(
+                                onClick = { showEditProfileDialog = true },
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .testTag("btn_edit_profile_name")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Edit Nama Profil",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
                         Text(
                             text = email,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                        // Photo Actions: Ganti & Hapus
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        // Photo Actions: Ganti, Emot HP, & Hapus
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             OutlinedButton(
                                 onClick = {
                                     photoPickerLauncher.launch(
@@ -245,10 +307,26 @@ fun ProfileScreen(
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Ganti Foto", style = MaterialTheme.typography.labelSmall)
+                                Text("Galeri", style = MaterialTheme.typography.labelSmall)
                             }
 
-                            if (photoUri != null && photoUri.isNotBlank()) {
+                            OutlinedButton(
+                                onClick = { showCustomEmojiDialog = true },
+                                shape = RoundedCornerShape(99.dp),
+                                modifier = Modifier
+                                    .height(34.dp)
+                                    .testTag("btn_custom_emoji_avatar")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SentimentSatisfiedAlt,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Emot HP", style = MaterialTheme.typography.labelSmall)
+                            }
+
+                            if (rawPhotoUri != null && rawPhotoUri.isNotBlank()) {
                                 OutlinedButton(
                                     onClick = { viewModel.removeProfilePhoto() },
                                     shape = RoundedCornerShape(99.dp),
@@ -265,6 +343,64 @@ fun ProfileScreen(
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("Hapus", style = MaterialTheme.typography.labelSmall)
                                 }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Avatar Options: Quick Preset & Emoticon Sendiri
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Avatar & Emotikon Profil:",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    TextButton(
+                        onClick = { showCustomEmojiDialog = true },
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Text(
+                            text = "+ Input Emot Sendiri",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    for (preset in ProfilePhotoHelper.PRESET_AVATARS) {
+                        val isSelected = rawPhotoUri == preset.id
+                        Surface(
+                            shape = CircleShape,
+                            color = if (isSelected) GoldTarget.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .border(
+                                    width = if (isSelected) 2.dp else 0.dp,
+                                    color = if (isSelected) GoldTarget else Color.Transparent,
+                                    shape = CircleShape
+                                )
+                                .clickable {
+                                    viewModel.selectPresetAvatar(preset.id)
+                                }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = preset.emoji,
+                                    fontSize = 20.sp
+                                )
                             }
                         }
                     }
@@ -314,13 +450,13 @@ fun ProfileScreen(
                             Icon(
                                 imageVector = Icons.Default.Security,
                                 contentDescription = null,
-                                tint = NavyHero,
+                                tint = if (isDark) GoldTarget else NavyHero,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "Akun Google Aman",
-                                color = NavyHero,
+                                color = if (isDark) MaterialTheme.colorScheme.onSurface else NavyHero,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold
                             )
@@ -332,173 +468,76 @@ fun ProfileScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Developer / Creator Bio Card (PATEN - Fixed & Not Editable, with Contacts & Social Media)
+        // Developer / Creator Bio Card (Click to Open Full Details)
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = CardDefaults.outlinedCardBorder(),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showCreatorDialog = true }
+                .testTag("card_about_creator")
         ) {
-            Column(modifier = Modifier.padding(18.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = CircleShape,
-                            color = NavyHero.copy(alpha = 0.1f),
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Code,
-                                    contentDescription = null,
-                                    tint = NavyHero,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "Tentang Pembuat Aplikasi",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Icon(
-                                    imageVector = Icons.Default.Verified,
-                                    contentDescription = "Official",
-                                    tint = IncomeGreen,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                            Text(
-                                text = "Profil Pengembang Resmi (Paten)",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Surface(
+                        shape = CircleShape,
+                        color = (if (isDark) GoldTarget else NavyHero).copy(alpha = 0.12f),
+                        modifier = Modifier.size(42.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Code,
+                                contentDescription = null,
+                                tint = if (isDark) GoldTarget else NavyHero,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "Nama Pengembang: ",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = "Tentang Pembuat Aplikasi",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
-                            Text(
-                                text = "Fandi Ahmad",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = NavyHero
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                imageVector = Icons.Default.Verified,
+                                contentDescription = "Official",
+                                tint = IncomeGreen,
+                                modifier = Modifier.size(16.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Aplikasi Catatan Keuangan dibuat khusus dengan dedikasi tinggi oleh Fandi Ahmad untuk memberikan solusi pencatatan finansial pribadi yang bersih, cepat, aman, dan tersinkronisasi antar perangkat secara real-time.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            lineHeight = 20.sp
+                            text = "Ketuk untuk melihat info lengkap pembuat",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Text(
-                    text = "Kontak & Sosial Media Pengembang",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Contact Items: Email, WhatsApp, Instagram, LinkedIn/Website
-                ContactRow(
-                    icon = Icons.Default.Email,
-                    label = "Email Resmi",
-                    value = "fandiahmad306@gmail.com",
-                    onClick = {
-                        val intent = Intent(Intent.ACTION_SENDTO).apply {
-                            data = Uri.parse("mailto:fandi.ahmad@thedeluxecoffee.com")
-                        }
-                        try { context.startActivity(intent) } catch (_: Exception) {}
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                ContactRow(
-                    icon = Icons.Default.Phone,
-                    label = "WhatsApp / Kontak",
-                    value = "+62 898-3691-505",
-                    onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/628983691505"))
-                        try { context.startActivity(intent) } catch (_: Exception) {}
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                ContactRow(
-                    icon = Icons.Default.Link,
-                    label = "Instagram",
-                    value = "@fandi_.ahmd",
-                    onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://instagram.com/fandi_.ahmd"))
-                        try { context.startActivity(intent) } catch (_: Exception) {}
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                ContactRow(
-                    icon = Icons.Default.Link,
-                    label = "GitHub & Portfolio",
-                    value = "github.com/fandi306",
-                    onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/fandi306"))
-                        try { context.startActivity(intent) } catch (_: Exception) {}
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                Button(
+                    onClick = { showCreatorDialog = true },
+                    shape = RoundedCornerShape(99.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isDark) GoldTarget else NavyHero,
+                        contentColor = if (isDark) NavyHeroDark else Color.White
+                    ),
+                    modifier = Modifier.height(36.dp)
                 ) {
-                    Text(
-                        text = "• Kotlin Compose",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "• Firebase Cloud Firestore",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "• Version 1.0.0",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text("Buka", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -535,6 +574,90 @@ fun ProfileScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 20.sp
                 )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Theme & Preferences Section
+        Text(
+            text = "Tema Tampilan",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = CardDefaults.outlinedCardBorder(),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = CircleShape,
+                            color = (if (isDark) GoldTarget else NavyHero).copy(alpha = 0.15f),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.DarkMode,
+                                    contentDescription = null,
+                                    tint = if (isDark) GoldTarget else NavyHero,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Pilihan Tema",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Pilih tema gelap, standar terang, atau ikuti HP",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = themeMode == AppThemeMode.SYSTEM,
+                        onClick = { appPreferences.setThemeMode(AppThemeMode.SYSTEM) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3)
+                    ) {
+                        Text("Ikuti HP", fontSize = 11.sp)
+                    }
+                    SegmentedButton(
+                        selected = themeMode == AppThemeMode.LIGHT,
+                        onClick = { appPreferences.setThemeMode(AppThemeMode.LIGHT) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3)
+                    ) {
+                        Text("Standar", fontSize = 11.sp)
+                    }
+                    SegmentedButton(
+                        selected = themeMode == AppThemeMode.DARK,
+                        onClick = { appPreferences.setThemeMode(AppThemeMode.DARK) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3)
+                    ) {
+                        Text("Dark Mode", fontSize = 11.sp)
+                    }
+                }
             }
         }
 
@@ -607,7 +730,7 @@ fun ProfileScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "${accounts.size} akun terdaftar (Lancar & Tidak Lancar)",
+                            text = "${accounts.size} akun terdaftar (Liquid / Lancar & Non-Liquid)",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -725,42 +848,132 @@ fun ProfileScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Logout Button
-        Button(
-            onClick = {
-                AuthManager.signOut(
-                    context = context,
-                    credentialManager = credentialManager,
-                    onSignOutComplete = onSignedOut,
-                    scope = coroutineScope
-                )
-            },
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurface
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .testTag("logout_button")
+        // Account Actions: Ganti Akun & Keluar
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.ExitToApp,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Keluar dari Akun",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
-            )
+            OutlinedButton(
+                onClick = { showSwitchAccountConfirmationDialog = true },
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp)
+                    .testTag("switch_account_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SwitchAccount,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Ganti Akun",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Button(
+                onClick = { showLogoutConfirmationDialog = true },
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                ),
+                modifier = Modifier
+                    .weight(1.2f)
+                    .height(52.dp)
+                    .testTag("logout_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ExitToApp,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Keluar",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(70.dp))
     }
 }
+
+    // Confirmation Dialog for Logout
+    if (showLogoutConfirmationDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirmationDialog = false },
+            title = {
+                Text("Konfirmasi Keluar Akun", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text("Apakah Anda yakin ingin keluar dari akun ini? Seluruh data catatan keuangan Anda tetap tersimpan aman di cloud dan akan otomatis sinkron saat Anda masuk kembali.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showLogoutConfirmationDialog = false
+                        AuthManager.signOut(
+                            context = context,
+                            credentialManager = credentialManager,
+                            onSignOutComplete = onSignedOut,
+                            scope = coroutineScope
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ExpenseRed)
+                ) {
+                    Text("Ya, Keluar", color = Color.White)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showLogoutConfirmationDialog = false }) {
+                    Text("Batal")
+                }
+            }
+        )
+    }
+
+    // Confirmation Dialog for Switch Account
+    if (showSwitchAccountConfirmationDialog) {
+        AlertDialog(
+            onDismissRequest = { showSwitchAccountConfirmationDialog = false },
+            title = {
+                Text("Konfirmasi Ganti Akun", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text("Apakah Anda ingin keluar untuk berganti ke akun Google yang lain?")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showSwitchAccountConfirmationDialog = false
+                        AuthManager.signOut(
+                            context = context,
+                            credentialManager = credentialManager,
+                            onSignOutComplete = onSignedOut,
+                            scope = coroutineScope
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSystemInDarkTheme()) GoldTarget else NavyHero,
+                        contentColor = if (isSystemInDarkTheme()) NavyHeroDark else Color.White
+                    )
+                ) {
+                    Text("Ganti Akun", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showSwitchAccountConfirmationDialog = false }) {
+                    Text("Batal")
+                }
+            }
+        )
+    }
 
     // Confirmation Dialog for Reset All Data
     if (showResetConfirmationDialog) {
@@ -820,6 +1033,143 @@ fun ProfileScreen(
         )
     }
 
+    if (showCreatorDialog) {
+        AlertDialog(
+            onDismissRequest = { showCreatorDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Code,
+                        contentDescription = null,
+                        tint = if (isDark) GoldTarget else NavyHero,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Tentang Pembuat Aplikasi",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Nama Pengembang: ",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "Fandi Ahmad",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = if (isDark) GoldTarget else NavyHero
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Aplikasi Catatan Keuangan dibuat khusus oleh Fandi Ahmad untuk memberikan solusi pencatatan finansial pribadi yang bersih, cepat, aman, dan tersinkronisasi antar perangkat secara real-time.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "Kontak & Portofolio Pengembang",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    ContactRow(
+                        icon = Icons.Default.Email,
+                        label = "Email Resmi",
+                        value = "fandiahmad306@gmail.com",
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:fandiahmad306@gmail.com")
+                            }
+                            try { context.startActivity(intent) } catch (_: Exception) {}
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    ContactRow(
+                        icon = Icons.Default.Phone,
+                        label = "WhatsApp / Kontak",
+                        value = "+62 898-3691-505",
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/628983691505"))
+                            try { context.startActivity(intent) } catch (_: Exception) {}
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    ContactRow(
+                        icon = Icons.Default.Link,
+                        label = "Instagram",
+                        value = "@fandi_.ahmd",
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://instagram.com/fandi_.ahmd"))
+                            try { context.startActivity(intent) } catch (_: Exception) {}
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    ContactRow(
+                        icon = Icons.Default.Link,
+                        label = "GitHub & Repository",
+                        value = "github.com/fandi306",
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/fandi306"))
+                            try { context.startActivity(intent) } catch (_: Exception) {}
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "Versi 1.0.0 · Kotlin Compose · Firebase Firestore",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showCreatorDialog = false },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isDark) GoldTarget else NavyHero,
+                        contentColor = if (isDark) NavyHeroDark else Color.White
+                    )
+                ) {
+                    Text("Tutup", fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
     if (showEditTargetDialog) {
         EditTargetDialog(
             currentTarget = savingsTarget,
@@ -844,6 +1194,180 @@ fun ProfileScreen(
             }
         )
     }
+
+    // Dialog Edit Profil (Ganti Nama & Bio)
+    if (showEditProfileDialog) {
+        var tempName by remember { mutableStateOf(displayName) }
+        var tempBio by remember { mutableStateOf(userProfile?.bio ?: "") }
+        var isSaving by remember { mutableStateOf(false) }
+
+        AlertDialog(
+            onDismissRequest = { if (!isSaving) showEditProfileDialog = false },
+            title = {
+                Text("Edit Profil Pengguna", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Ubah nama tampilan akun Anda. Nama ini akan tersimpan dan tersinkron ke cloud.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedTextField(
+                        value = tempName,
+                        onValueChange = { tempName = it },
+                        label = { Text("Nama Lengkap") },
+                        placeholder = { Text("Masukkan nama Anda") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("input_edit_display_name")
+                    )
+
+                    OutlinedTextField(
+                        value = tempBio,
+                        onValueChange = { tempBio = it },
+                        label = { Text("Catatan / Bio Singkat (Opsional)") },
+                        placeholder = { Text("Contoh: Menuju merdeka finansial") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("input_edit_profile_bio")
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (tempName.isNotBlank()) {
+                            isSaving = true
+                            viewModel.updateProfileBio(tempName.trim(), tempBio.trim())
+                            showEditProfileDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isDark) GoldTarget else NavyHero,
+                        contentColor = if (isDark) NavyHeroDark else Color.White
+                    ),
+                    modifier = Modifier.testTag("btn_save_profile_name")
+                ) {
+                    Text("Simpan", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showEditProfileDialog = false },
+                    enabled = !isSaving
+                ) {
+                    Text("Batal")
+                }
+            }
+        )
+    }
+
+    // Dialog Input Custom Emoji Avatar dari Keyboard HP
+    if (showCustomEmojiDialog) {
+        var customEmojiInput by remember { mutableStateOf("") }
+        val quickEmojiPicks = listOf("😀", "😎", "🥳", "🤠", "🤑", "🦊", "🦁", "🐼", "🚀", "👑", "💎", "⭐", "🥑", "☕", "⚽")
+
+        AlertDialog(
+            onDismissRequest = { showCustomEmojiDialog = false },
+            title = {
+                Text("Pilih atau Ketik Emoticon HP", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Anda bisa mengetik emotikon apa saja langsung dari keyboard HP Anda, atau pilih salah satu emot populer di bawah.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedTextField(
+                        value = customEmojiInput,
+                        onValueChange = { customEmojiInput = it },
+                        label = { Text("Ketik Emoticon dari Keyboard HP") },
+                        placeholder = { Text("Contoh: 🦊 atau 🦄 atau 💰") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("input_custom_emoji_avatar")
+                    )
+
+                    Text(
+                        text = "Rekomendasi Cepat:",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        for (emoji in quickEmojiPicks.take(7)) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clickable { customEmojiInput = emoji }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(text = emoji, fontSize = 18.sp)
+                                }
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        for (emoji in quickEmojiPicks.drop(7).take(7)) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clickable { customEmojiInput = emoji }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(text = emoji, fontSize = 18.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val cleaned = customEmojiInput.trim()
+                        if (cleaned.isNotEmpty()) {
+                            viewModel.updateProfilePhoto("emoji:$cleaned")
+                            showCustomEmojiDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isDark) GoldTarget else NavyHero,
+                        contentColor = if (isDark) NavyHeroDark else Color.White
+                    ),
+                    modifier = Modifier.testTag("btn_save_custom_emoji")
+                ) {
+                    Text("Gunakan Emot", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showCustomEmojiDialog = false }
+                ) {
+                    Text("Batal")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -853,6 +1377,7 @@ private fun ContactRow(
     value: String,
     onClick: () -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
@@ -867,7 +1392,7 @@ private fun ContactRow(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = NavyHero,
+                tint = if (isDark) GoldTarget else NavyHero,
                 modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.width(10.dp))

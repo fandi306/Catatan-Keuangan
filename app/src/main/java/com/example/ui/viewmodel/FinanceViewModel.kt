@@ -7,7 +7,11 @@ import com.example.data.model.Account
 import com.example.data.model.Transaction
 import com.example.data.model.UserProfile
 import com.example.data.repository.FinanceRepository
+import com.example.util.FinancialAdvice
+import com.example.util.FinancialAdvisor
 import com.example.util.Formatters
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -109,6 +113,26 @@ class FinanceViewModel(
         map.toList().sortedByDescending { it.second }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val financialAdvice: StateFlow<FinancialAdvice> = combine(
+        monthlyIncome,
+        monthlyExpense,
+        totalAsset,
+        savingsTarget,
+        categoryBreakdown
+    ) { inc, exp, asset, target, cats ->
+        FinancialAdvisor.evaluate(
+            income = inc,
+            expense = exp,
+            totalAsset = asset,
+            savingsTarget = target,
+            categoryBreakdown = cats
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        FinancialAdvisor.evaluate(0L, 0L, 0L, 0L, emptyList())
+    )
+
     val displayedTransactions: StateFlow<List<Transaction>> = combine(
         monthlyTransactions,
         filterType,
@@ -132,7 +156,11 @@ class FinanceViewModel(
 
     init {
         viewModelScope.launch {
-            repository.seedInitialDataIfEmpty(userId)
+            val user = try { com.google.firebase.Firebase.auth.currentUser } catch (_: Exception) { null }
+            val defaultPhoto = user?.photoUrl?.toString() ?: ""
+            val defaultName = user?.displayName ?: ""
+            val defaultEmail = user?.email ?: ""
+            repository.seedInitialDataIfEmpty(userId, defaultName, defaultEmail, defaultPhoto)
         }
     }
 
@@ -214,10 +242,41 @@ class FinanceViewModel(
         }
     }
 
+    fun uploadProfilePhoto(context: android.content.Context, uri: android.net.Uri) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val base64Data = com.example.util.ProfilePhotoHelper.uriToBase64DataUrl(context, uri)
+            if (base64Data != null) {
+                try {
+                    repository.updateProfilePhoto(base64Data)
+                    _uiNotice.value = "Foto profil berhasil disinkronkan ke cloud"
+                } catch (_: Exception) {
+                    _uiNotice.value = "Gagal menyinkronkan foto ke cloud"
+                }
+            } else {
+                _uiNotice.value = "Gagal memproses foto profil"
+            }
+        }
+    }
+
+    fun selectPresetAvatar(avatarId: String) {
+        viewModelScope.launch {
+            try {
+                repository.updateProfilePhoto(avatarId)
+                _uiNotice.value = "Avatar profil berhasil disimpan ke cloud"
+            } catch (_: Exception) {
+                _uiNotice.value = "Gagal menyimpan avatar"
+            }
+        }
+    }
+
     fun updateProfilePhoto(photoUri: String) {
         viewModelScope.launch {
-            repository.updateProfilePhoto(photoUri)
-            _uiNotice.value = "Foto profil berhasil diperbarui"
+            try {
+                repository.updateProfilePhoto(photoUri)
+                _uiNotice.value = "Foto profil berhasil diperbarui"
+            } catch (_: Exception) {
+                _uiNotice.value = "Gagal memperbarui foto"
+            }
         }
     }
 
