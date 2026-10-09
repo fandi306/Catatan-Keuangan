@@ -1,0 +1,412 @@
+package com.example.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import com.example.data.model.Account
+import com.example.ui.theme.ExpenseRed
+import com.example.ui.theme.IncomeGreen
+import com.example.ui.theme.NavyHero
+import com.example.util.Formatters
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+val DEFAULT_CATEGORIES = listOf(
+    "Makan",
+    "Kebutuhan Kos",
+    "Pengeluaran Darurat",
+    "Pembayaran Lainnya",
+    "Transportasi",
+    "Hiburan",
+    "Belanja",
+    "Kesehatan"
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddTransactionDialog(
+    accounts: List<Account>,
+    onDismiss: () -> Unit,
+    onSave: (type: String, desc: String, amount: Long, account: String, category: String, date: String) -> Unit
+) {
+    var type by remember { mutableStateOf("out") } // "out" or "in"
+    var description by remember { mutableStateOf("") }
+    var rawAmount by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf(DEFAULT_CATEGORIES[0]) }
+    var selectedAccount by remember {
+        mutableStateOf(accounts.firstOrNull()?.name ?: "Tunai")
+    }
+    var selectedDate by remember { mutableStateOf(Formatters.currentIsoDate()) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("add_transaction_dialog")
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(22.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = "Catat Transaksi",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Segmented button: Pengeluaran / Pemasukan
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    SegmentedButton(
+                        selected = type == "out",
+                        onClick = { type = "out" },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                        colors = SegmentedButtonDefaults.colors(
+                            activeContainerColor = ExpenseRed.copy(alpha = 0.15f),
+                            activeContentColor = ExpenseRed
+                        ),
+                        modifier = Modifier.testTag("segment_expense")
+                    ) {
+                        Text("Pengeluaran", fontWeight = FontWeight.Bold)
+                    }
+
+                    SegmentedButton(
+                        selected = type == "in",
+                        onClick = { type = "in" },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                        colors = SegmentedButtonDefaults.colors(
+                            activeContainerColor = IncomeGreen.copy(alpha = 0.15f),
+                            activeContentColor = IncomeGreen
+                        ),
+                        modifier = Modifier.testTag("segment_income")
+                    ) {
+                        Text("Pemasukan", fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = if (type == "out") "• Pengeluaran akan mengurangi saldo akun yang dipilih" else "• Pemasukan akan menambah saldo akun yang dipilih",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (type == "out") ExpenseRed else IncomeGreen,
+                    modifier = Modifier.padding(start = 2.dp)
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Keterangan
+                Text(
+                    text = "Keterangan",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    placeholder = { Text("Contoh: Makan Siang / Gaji Bulanan") },
+                    supportingText = {
+                        Text("Tulis keperluan belanja atau sumber uang yang diterima.")
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_description"),
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Nominal (Rp) with formatted thousands
+                Text(
+                    text = "Nominal (Rp)",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = rawAmount,
+                    onValueChange = { input ->
+                        val digits = input.filter { it.isDigit() }
+                        rawAmount = if (digits.isNotBlank()) {
+                            val parsed = digits.toLongOrNull() ?: 0L
+                            Formatters.formatNumber(parsed)
+                        } else {
+                            ""
+                        }
+                    },
+                    placeholder = { Text("Contoh: 50.000") },
+                    supportingText = {
+                        Text("Ketik angka nominal tanpa titik (contoh: ketik 50000 untuk Rp 50.000).")
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_amount"),
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    textStyle = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp
+                    )
+                )
+
+                // Category chips (Only for expense)
+                if (type == "out") {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Kategori Pengeluaran",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Kelompokkan belanja Anda agar grafik analitik bulanan tercatat rapi.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        for (cat in DEFAULT_CATEGORIES) {
+                            FilterChip(
+                                selected = selectedCategory == cat,
+                                onClick = { selectedCategory = cat },
+                                label = { Text(cat) },
+                                shape = RoundedCornerShape(99.dp),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = NavyHero,
+                                    selectedLabelColor = Color.White
+                                ),
+                                modifier = Modifier.testTag("chip_cat_$cat")
+                            )
+                        }
+                    }
+                }
+
+                // Account chips
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(
+                    text = "Akun / Dompet Penyimpanan",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Pilih dompet/rekening tempat uang dikeluarkan atau disimpan.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    for (acc in accounts) {
+                        FilterChip(
+                            selected = selectedAccount == acc.name,
+                            onClick = { selectedAccount = acc.name },
+                            label = { Text(acc.name) },
+                            shape = RoundedCornerShape(99.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = NavyHero,
+                                selectedLabelColor = Color.White
+                            ),
+                            modifier = Modifier.testTag("chip_acc_${acc.name}")
+                        )
+                    }
+                }
+
+                // Date Picker trigger
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(
+                    text = "Tanggal Transaksi",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Tanggal pencatatan untuk riwayat keuangan bulanan.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = Formatters.formatDateIndo(selectedDate),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    OutlinedButton(
+                        onClick = { showDatePicker = true },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Pilih Tanggal")
+                    }
+                }
+
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = errorMessage ?: "",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Actions: Batal & Simpan
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("cancel_transaction_button")
+                    ) {
+                        Text("Batal")
+                    }
+
+                    Button(
+                        onClick = {
+                            val amountVal = Formatters.parseAmount(rawAmount)
+                            val descVal = description.trim()
+                            if (descVal.isBlank()) {
+                                errorMessage = "Isi keterangan transaksi dulu."
+                                return@Button
+                            }
+                            if (amountVal <= 0L) {
+                                errorMessage = "Isi nominal lebih dari 0."
+                                return@Button
+                            }
+                            if (selectedAccount.isBlank()) {
+                                errorMessage = "Pilih akun pembayaran."
+                                return@Button
+                            }
+                            errorMessage = null
+                            onSave(
+                                type,
+                                descVal,
+                                amountVal,
+                                selectedAccount,
+                                if (type == "out") selectedCategory else "",
+                                selectedDate
+                            )
+                        },
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = NavyHero,
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier
+                            .weight(2f)
+                            .height(48.dp)
+                            .testTag("save_transaction_button")
+                    ) {
+                        Text("Simpan", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = System.currentTimeMillis()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val millis = datePickerState.selectedDateMillis
+                    if (millis != null) {
+                        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                        selectedDate = sdf.format(Date(millis))
+                    }
+                    showDatePicker = false
+                }) {
+                    Text("Pilih")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Batal")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+}

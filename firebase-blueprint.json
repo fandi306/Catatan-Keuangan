@@ -1,0 +1,141 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile, configuration, and savings goal",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The unique Firebase Auth UID of the user"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name of the user"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user"
+        },
+        "photoUri": {
+          "type": "string",
+          "description": "Local/Cloud photo avatar URI of the user"
+        },
+        "bio": {
+          "type": "string",
+          "description": "Short bio or developer info"
+        },
+        "savingsTarget": {
+          "type": "number",
+          "description": "Target total savings/asset amount in Rupiah"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update server timestamp"
+        }
+      },
+      "required": ["userId", "savingsTarget"]
+    },
+    "Account": {
+      "title": "Account",
+      "description": "Financial account or wallet belonging to the user",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique ID of the account"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the account owner"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the account (e.g., Tunai, BRI, Line Bank)"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["liquid", "non_liquid"],
+          "description": "Classification of asset: liquid (aset lancar) or non_liquid (aset tidak lancar)"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["id", "userId", "name", "type"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Single income or expense entry",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique transaction ID"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the transaction owner"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["in", "out"],
+          "description": "Transaction type: 'in' for income or 'out' for expense"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description / title of the transaction"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount in Rupiah (must be greater than 0)"
+        },
+        "account": {
+          "type": "string",
+          "description": "Account name or ID where transaction took place"
+        },
+        "category": {
+          "type": "string",
+          "description": "Expense category (e.g. Makan, Kebutuhan Kos, etc.)"
+        },
+        "date": {
+          "type": "string",
+          "description": "Transaction date in ISO format YYYY-MM-DD"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["id", "userId", "type", "description", "amount", "account", "date"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile with target settings"
+    },
+    "/users/{userId}/accounts/{accountId}": {
+      "schema": "Account",
+      "description": "User accounts"
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "User financial transactions"
+    }
+  }
+}

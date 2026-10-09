@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidTimestamp(val) {
+      return val is timestamp && val <= request.time;
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['userId', 'savingsTarget']) &&
+             data.userId == userId &&
+             data.savingsTarget is number &&
+             data.savingsTarget >= 0 &&
+             (!('displayName' in data) || data.displayName is string) &&
+             (!('email' in data) || data.email is string) &&
+             (!('photoUri' in data) || data.photoUri is string) &&
+             (!('bio' in data) || data.bio is string) &&
+             (!('updatedAt' in data) || isValidTimestamp(data.updatedAt));
+    }
+
+    function isValidAccount(data, userId) {
+      return data.keys().hasAll(['id', 'userId', 'name', 'type']) &&
+             data.id is string && data.id.size() > 0 &&
+             data.userId == userId &&
+             data.name is string && data.name.size() > 0 &&
+             (data.type == 'liquid' || data.type == 'non_liquid') &&
+             (!('createdAt' in data) || isValidTimestamp(data.createdAt)) &&
+             (!('updatedAt' in data) || isValidTimestamp(data.updatedAt));
+    }
+
+    function isValidTransaction(data, userId) {
+      return data.keys().hasAll(['id', 'userId', 'type', 'description', 'amount', 'account', 'date']) &&
+             data.id is string && data.id.size() > 0 &&
+             data.userId == userId &&
+             (data.type == 'in' || data.type == 'out') &&
+             data.description is string && data.description.size() > 0 &&
+             data.amount is number && data.amount > 0 &&
+             data.account is string && data.account.size() > 0 &&
+             data.date is string && data.date.size() >= 10 &&
+             (!('category' in data) || data.category is string) &&
+             (!('createdAt' in data) || isValidTimestamp(data.createdAt)) &&
+             (!('updatedAt' in data) || isValidTimestamp(data.updatedAt));
+    }
+
+    match /users/{userId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isValidUserProfile(request.resource.data, userId);
+
+      match /accounts/{accountId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidAccount(request.resource.data, userId);
+      }
+
+      match /transactions/{transactionId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidTransaction(request.resource.data, userId);
+      }
+    }
+  }
+}

@@ -1,0 +1,606 @@
+package com.example.ui.screens
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.example.R
+import com.example.ui.components.AccountChipsRow
+import com.example.ui.components.AccountManagementDialog
+import com.example.ui.components.EditTargetDialog
+import com.example.ui.components.HeroCard
+import com.example.ui.components.MonthlySummaryCard
+import com.example.ui.components.TransactionItem
+import com.example.ui.theme.GoldTarget
+import com.example.ui.theme.IncomeGreen
+import com.example.ui.theme.NavyHero
+import com.example.ui.viewmodel.FinanceViewModel
+import com.example.util.Formatters
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
+import java.util.Calendar
+
+@Composable
+fun HomeScreen(
+    viewModel: FinanceViewModel,
+    onNavigateToProfile: () -> Unit,
+    onNavigateToTransactions: () -> Unit,
+    onNavigateToAnalytics: () -> Unit,
+    onAddNewTransaction: () -> Unit
+) {
+    val totalAsset by viewModel.totalAsset.collectAsState()
+    val liquidAsset by viewModel.liquidAsset.collectAsState()
+    val nonLiquidAsset by viewModel.nonLiquidAsset.collectAsState()
+    val savingsTarget by viewModel.savingsTarget.collectAsState()
+    val targetProgressPct by viewModel.targetProgressPct.collectAsState()
+
+    val accounts by viewModel.accounts.collectAsState()
+    val accountBalances by viewModel.accountBalances.collectAsState()
+
+    val selectedMonth by viewModel.selectedMonth.collectAsState()
+    val monthlyIncome by viewModel.monthlyIncome.collectAsState()
+    val monthlyExpense by viewModel.monthlyExpense.collectAsState()
+    val monthlyNet by viewModel.monthlyNet.collectAsState()
+    val categoryBreakdown by viewModel.categoryBreakdown.collectAsState()
+
+    val displayedTransactions by viewModel.displayedTransactions.collectAsState()
+    val allTransactions by viewModel.transactions.collectAsState()
+
+    val userProfile by viewModel.userProfile.collectAsState()
+    val currentUser = Firebase.auth.currentUser
+
+    var showEditTargetDialog by remember { mutableStateOf(false) }
+    var showManageAccountsDialog by remember { mutableStateOf(false) }
+
+    val rawName = userProfile?.displayName?.ifBlank { null }
+        ?: currentUser?.displayName?.ifBlank { null }
+        ?: "Fandi"
+    val firstName = rawName.trim().split(" ").firstOrNull()?.ifBlank { "Fandi" } ?: "Fandi"
+    val photoUri = userProfile?.photoUri?.ifBlank { null }
+
+    // Responsive: Centered fluid layout up to 720.dp so tablet portrait and phones look natural and comfortable
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 720.dp)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            item {
+                LineBankStyleHeader(
+                    firstName = firstName,
+                    photoUri = photoUri,
+                    onNavigateToProfile = onNavigateToProfile
+                )
+            }
+
+            item {
+                HeroCard(
+                    totalAsset = totalAsset,
+                    liquidAsset = liquidAsset,
+                    nonLiquidAsset = nonLiquidAsset,
+                    savingsTarget = savingsTarget,
+                    targetProgressPct = targetProgressPct,
+                    onEditTargetClick = { showEditTargetDialog = true },
+                    onViewAnalyticsClick = onNavigateToAnalytics
+                )
+            }
+
+            // Onboarding Guide for new users (if transactions are 0)
+            if (allTransactions.isEmpty()) {
+                item {
+                    NewUserGuidanceCard(
+                        onAddTransactionClick = onAddNewTransaction,
+                        onLoadSampleDataClick = { viewModel.restoreSeedData() }
+                    )
+                }
+            }
+
+            item {
+                AccountChipsRow(
+                    accounts = accounts,
+                    balances = accountBalances,
+                    onManageAccountsClick = { showManageAccountsDialog = true }
+                )
+            }
+
+            item {
+                MonthlySummaryCard(
+                    selectedMonth = selectedMonth,
+                    income = monthlyIncome,
+                    expense = monthlyExpense,
+                    net = monthlyNet,
+                    categoryBreakdown = categoryBreakdown,
+                    onPrevMonth = { viewModel.changeMonth(-1) },
+                    onNextMonth = { viewModel.changeMonth(1) }
+                )
+            }
+
+            item {
+                RecentTransactionsCard(
+                    transactions = displayedTransactions.take(5),
+                    onViewAllClick = onNavigateToTransactions,
+                    onDeleteTransaction = { viewModel.deleteTransaction(it) }
+                )
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(90.dp))
+            }
+        }
+    }
+
+    if (showEditTargetDialog) {
+        EditTargetDialog(
+            currentTarget = savingsTarget,
+            onDismiss = { showEditTargetDialog = false },
+            onSave = { newTarget ->
+                viewModel.updateSavingsTarget(newTarget)
+                showEditTargetDialog = false
+            }
+        )
+    }
+
+    if (showManageAccountsDialog) {
+        AccountManagementDialog(
+            accounts = accounts,
+            balances = accountBalances,
+            onDismiss = { showManageAccountsDialog = false },
+            onAddAccount = { name, type ->
+                viewModel.addAccount(name, type)
+            },
+            onDeleteAccount = { accId ->
+                viewModel.deleteAccount(accId)
+            }
+        )
+    }
+}
+
+/**
+ * Onboarding Guidance Card displayed when user has 0 transactions
+ */
+@Composable
+private fun NewUserGuidanceCard(
+    onAddTransactionClick: () -> Unit,
+    onLoadSampleDataClick: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = CardDefaults.outlinedCardBorder(),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    shape = CircleShape,
+                    color = GoldTarget.copy(alpha = 0.15f),
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Lightbulb,
+                            contentDescription = null,
+                            tint = GoldTarget,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = "Cara Mudah Mengisi Catatan",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Saldo & transaksi Anda saat ini masih 0",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            GuidanceStep(
+                step = "1",
+                title = "Catat Transaksi Pertama",
+                description = "Tekan tombol '+ Catat transaksi' di bawah. Pilih jenis Pemasukan (misal: Gaji) atau Pengeluaran (misal: Makan)."
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            GuidanceStep(
+                step = "2",
+                title = "Pilih Akun / Dompet",
+                description = "Tentukan apakah uang disimpan di Tunai, Bank BRI, Line Bank, atau akun lainnya agar saldo tercatat akurat."
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            GuidanceStep(
+                step = "3",
+                title = "Pantau Grafik Pencapaian",
+                description = "Setiap pemasukan otomatis menaikkan persentase capaian target tabungan dan grafik kurva aset Anda!"
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = onAddTransactionClick,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = NavyHero),
+                    modifier = Modifier.weight(1.3f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Catat Sekarang", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+
+                OutlinedButton(
+                    onClick = onLoadSampleDataClick,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.RestartAlt,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Contoh Data")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GuidanceStep(
+    step: String,
+    title: String,
+    description: String
+) {
+    Row(verticalAlignment = Alignment.Top) {
+        Surface(
+            shape = CircleShape,
+            color = NavyHero,
+            modifier = Modifier.size(22.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = step,
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 18.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun LineBankStyleHeader(
+    firstName: String,
+    photoUri: String?,
+    onNavigateToProfile: () -> Unit
+) {
+    val cal = Calendar.getInstance()
+    val hour = cal.get(Calendar.HOUR_OF_DAY)
+    val greetingWord = when (hour) {
+        in 4..10 -> "Selamat Pagi,"
+        in 11..14 -> "Selamat Siang,"
+        in 15..18 -> "Selamat Sore,"
+        else -> "Selamat Malam,"
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp, bottom = 6.dp)
+    ) {
+        // Top Navigation Bar
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Brand Logo & Name
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.testTag("brand_header")
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = NavyHero,
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Image(
+                            painter = painterResource(id = R.drawable.catatan_keuangan_icon_1791516859908),
+                            contentDescription = "Logo",
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Catatan Keuangan",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    letterSpacing = (-0.5).sp
+                )
+            }
+
+            // Right icons: Cloud Status & Profile Avatar
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(99.dp),
+                    color = IncomeGreen.copy(alpha = 0.12f),
+                    modifier = Modifier.height(34.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudDone,
+                            contentDescription = "Sync Aktif",
+                            tint = IncomeGreen,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Sync",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = IncomeGreen,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = CircleShape,
+                    color = NavyHero,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .border(1.5.dp, GoldTarget, CircleShape)
+                        .clickable { onNavigateToProfile() }
+                        .testTag("profile_avatar_button")
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        if (photoUri != null && photoUri.isNotBlank()) {
+                            AsyncImage(
+                                model = photoUri,
+                                contentDescription = "Foto Profil",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Text(
+                                text = firstName.take(1).uppercase(),
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        // Big Typography Greeting like reference screenshot:
+        // "Selamat Siang,
+        //  FANDI!"
+        Column {
+            Text(
+                text = greetingWord,
+                style = MaterialTheme.typography.displayMedium,
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onBackground,
+                lineHeight = 36.sp
+            )
+            Text(
+                text = "${firstName.uppercase()}!",
+                style = MaterialTheme.typography.displayMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onBackground,
+                letterSpacing = (-0.5).sp,
+                lineHeight = 40.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecentTransactionsCard(
+    transactions: List<com.example.data.model.Transaction>,
+    onViewAllClick: () -> Unit,
+    onDeleteTransaction: (com.example.data.model.Transaction) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = CardDefaults.outlinedCardBorder()
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Transaksi Terkini",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                TextButton(
+                    onClick = onViewAllClick,
+                    modifier = Modifier.testTag("btn_view_all_transactions")
+                ) {
+                    Text(
+                        text = "Lihat Semua",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (transactions.isNotEmpty()) {
+                Column {
+                    transactions.forEachIndexed { index, tx ->
+                        AnimatedVisibility(
+                            visible = true,
+                            enter = fadeIn() + slideInVertically(),
+                            exit = fadeOut() + slideOutVertically()
+                        ) {
+                            Column {
+                                TransactionItem(
+                                    transaction = tx,
+                                    onDeleteClick = { onDeleteTransaction(tx) }
+                                )
+                                if (index < transactions.size - 1) {
+                                    HorizontalDivider(
+                                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                        thickness = 0.8.dp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Belum Ada Catatan Transaksi (Rp 0)",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Ketuk tombol '+ Catat transaksi' di bawah untuk mulai mencatat pemasukan atau pengeluaran pertama Anda.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
