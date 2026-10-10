@@ -11,6 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,7 +31,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Lightbulb
@@ -70,7 +70,6 @@ import com.example.ui.components.EditTargetDialog
 import com.example.ui.components.HeroCard
 import com.example.ui.components.MonthlySummaryCard
 import com.example.ui.components.RotatableFinancialQuoteCard
-import com.example.ui.components.ScanReceiptDialog
 import com.example.ui.components.TransactionItem
 import com.example.ui.components.WarningBannersSection
 import com.example.ui.theme.GoldTarget
@@ -117,7 +116,6 @@ fun HomeScreen(
 
     var showEditTargetDialog by remember { mutableStateOf(false) }
     var showManageAccountsDialog by remember { mutableStateOf(false) }
-    var showScanReceiptDialog by remember { mutableStateOf(false) }
 
     val rawName = userProfile?.displayName?.ifBlank { null }
         ?: currentUser?.displayName?.ifBlank { null }
@@ -125,216 +123,236 @@ fun HomeScreen(
     val firstName = rawName.trim().split(" ").firstOrNull()?.ifBlank { "Fandi" } ?: "Fandi"
     val photoUri = userProfile?.photoUri?.ifBlank { null } ?: currentUser?.photoUrl?.toString()
 
-    // Responsive: Centered fluid layout up to 720.dp so tablet portrait and phones look natural and comfortable
-    Box(
+    // Responsive adaptive layout: 2 columns on wide screens (tablets) or single clean column on mobile phones
+    BoxWithConstraints(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.TopCenter
     ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .widthIn(max = 720.dp)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            item {
-                LineBankStyleHeader(
-                    firstName = firstName,
-                    photoUri = photoUri,
-                    onNavigateToProfile = onNavigateToProfile
-                )
-            }
+        val isTablet = maxWidth >= 700.dp
 
-            item {
-                HeroCard(
-                    totalAsset = totalAsset,
-                    liquidAsset = liquidAsset,
-                    nonLiquidAsset = nonLiquidAsset,
-                    savingsTarget = savingsTarget,
-                    targetProgressPct = targetProgressPct,
-                    onEditTargetClick = { showEditTargetDialog = true },
-                    onViewAnalyticsClick = onNavigateToAnalytics
-                )
-            }
-
-            // Guide for new users when wallets/accounts are empty
-            if (accounts.isEmpty()) {
+        if (isTablet) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .widthIn(max = 1040.dp)
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 item {
-                    Card(
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        border = CardDefaults.outlinedCardBorder(),
-                        modifier = Modifier.fillMaxWidth().testTag("empty_accounts_banner")
+                    LineBankStyleHeader(
+                        firstName = firstName,
+                        photoUri = photoUri,
+                        onNavigateToProfile = onNavigateToProfile
+                    )
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(18.dp),
+                        verticalAlignment = Alignment.Top
                     ) {
-                        Column(modifier = Modifier.padding(18.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = GoldTarget.copy(alpha = 0.15f),
-                                    modifier = Modifier.size(38.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = Icons.Default.AccountBalanceWallet,
-                                            contentDescription = null,
-                                            tint = if (isSystemInDarkTheme()) GoldTarget else NavyHero,
-                                            modifier = Modifier.size(20.dp)
+                        // Left Column: Hero Total Asset + Monthly Summary Chart
+                        Column(
+                            modifier = Modifier.weight(1.1f),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            HeroCard(
+                                totalAsset = totalAsset,
+                                liquidAsset = liquidAsset,
+                                nonLiquidAsset = nonLiquidAsset,
+                                savingsTarget = savingsTarget,
+                                targetProgressPct = targetProgressPct,
+                                onEditTargetClick = { showEditTargetDialog = true },
+                                onViewAnalyticsClick = onNavigateToAnalytics
+                            )
+
+                            MonthlySummaryCard(
+                                selectedMonth = selectedMonth,
+                                income = monthlyIncome,
+                                expense = monthlyExpense,
+                                net = monthlyNet,
+                                categoryBreakdown = categoryBreakdown,
+                                onPrevMonth = { viewModel.changeMonth(-1) },
+                                onNextMonth = { viewModel.changeMonth(1) }
+                            )
+                        }
+
+                        // Right Column: Dompet & Akun, Kutipan Finansial, Warnings, Transaksi Terkini
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            AccountChipsRow(
+                                accounts = accounts,
+                                balances = accountBalances,
+                                onManageAccountsClick = { showManageAccountsDialog = true }
+                            )
+
+                            RotatableFinancialQuoteCard(
+                                advice = financialAdvice
+                            )
+
+                            if (financialAdvice.warnings.isNotEmpty()) {
+                                WarningBannersSection(
+                                    warnings = financialAdvice.warnings
+                                )
+                            }
+
+                            RecentTransactionsCard(
+                                transactions = displayedTransactions.take(6),
+                                onViewAllClick = onNavigateToTransactions,
+                                onDeleteTransaction = { viewModel.deleteTransaction(it) }
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
+            }
+        } else {
+            // Mobile Phone: Single clean scrollable column
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .widthIn(max = 720.dp)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                item {
+                    LineBankStyleHeader(
+                        firstName = firstName,
+                        photoUri = photoUri,
+                        onNavigateToProfile = onNavigateToProfile
+                    )
+                }
+
+                item {
+                    HeroCard(
+                        totalAsset = totalAsset,
+                        liquidAsset = liquidAsset,
+                        nonLiquidAsset = nonLiquidAsset,
+                        savingsTarget = savingsTarget,
+                        targetProgressPct = targetProgressPct,
+                        onEditTargetClick = { showEditTargetDialog = true },
+                        onViewAnalyticsClick = onNavigateToAnalytics
+                    )
+                }
+
+                // Guide for new users when wallets/accounts are empty
+                if (accounts.isEmpty()) {
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = CardDefaults.outlinedCardBorder(),
+                            modifier = Modifier.fillMaxWidth().testTag("empty_accounts_banner")
+                        ) {
+                            Column(modifier = Modifier.padding(18.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = GoldTarget.copy(alpha = 0.15f),
+                                        modifier = Modifier.size(38.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.AccountBalanceWallet,
+                                                contentDescription = null,
+                                                tint = if (isSystemInDarkTheme()) GoldTarget else NavyHero,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = "Buat Dompet Pertama Anda",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "Anda belum memiliki akun atau dompet (seperti Tunai, Rekening, E-Wallet). Buat dompet dulu sebelum mencatat transaksi.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(
-                                        text = "Buat Dompet Pertama Anda",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "Anda belum memiliki akun atau dompet (seperti Tunai, Rekening, E-Wallet). Buat dompet dulu sebelum mencatat transaksi.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Button(
+                                    onClick = { showManageAccountsDialog = true },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isSystemInDarkTheme()) GoldTarget else NavyHero,
+                                        contentColor = if (isSystemInDarkTheme()) NavyHeroDark else Color.White
+                                    ),
+                                    modifier = Modifier.fillMaxWidth().height(44.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Buat Dompet Sekarang", fontWeight = FontWeight.Bold)
                                 }
-                            }
-                            Spacer(modifier = Modifier.height(14.dp))
-                            Button(
-                                onClick = { showManageAccountsDialog = true },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isSystemInDarkTheme()) GoldTarget else NavyHero,
-                                    contentColor = if (isSystemInDarkTheme()) NavyHeroDark else Color.White
-                                ),
-                                modifier = Modifier.fillMaxWidth().height(44.dp)
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Buat Dompet Sekarang", fontWeight = FontWeight.Bold)
                             }
                         }
                     }
-                }
-            } else if (allTransactions.isEmpty()) {
-                item {
-                    NewUserGuidanceCard(
-                        onAddTransactionClick = onAddNewTransaction,
-                        onLoadSampleDataClick = { viewModel.restoreSeedData() }
-                    )
-                }
-            }
-
-            item {
-                AccountChipsRow(
-                    accounts = accounts,
-                    balances = accountBalances,
-                    onManageAccountsClick = { showManageAccountsDialog = true }
-                )
-            }
-
-            item {
-                MonthlySummaryCard(
-                    selectedMonth = selectedMonth,
-                    income = monthlyIncome,
-                    expense = monthlyExpense,
-                    net = monthlyNet,
-                    categoryBreakdown = categoryBreakdown,
-                    onPrevMonth = { viewModel.changeMonth(-1) },
-                    onNextMonth = { viewModel.changeMonth(1) }
-                )
-            }
-
-            // Kutipan Finansial Dinamis (Berubah Tiap Jam / Hari)
-            item {
-                RotatableFinancialQuoteCard(
-                    advice = financialAdvice
-                )
-            }
-
-            if (financialAdvice.warnings.isNotEmpty()) {
-                item {
-                    WarningBannersSection(
-                        warnings = financialAdvice.warnings
-                    )
-                }
-            }
-
-            // Quick Scan Receipt Banner
-            item {
-                Card(
-                    shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = CardDefaults.outlinedCardBorder(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showScanReceiptDialog = true }
-                        .testTag("banner_scan_receipt")
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = GoldTarget.copy(alpha = 0.18f),
-                                modifier = Modifier.size(40.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.DocumentScanner,
-                                        contentDescription = null,
-                                        tint = if (isSystemInDarkTheme()) GoldTarget else NavyHero,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = "Scan Nota Otomatis",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "Foto struk belanja jadi pengeluaran",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        Button(
-                            onClick = { showScanReceiptDialog = true },
-                            shape = RoundedCornerShape(99.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isSystemInDarkTheme()) GoldTarget else NavyHero,
-                                contentColor = if (isSystemInDarkTheme()) NavyHeroDark else Color.White
-                            ),
-                            modifier = Modifier.height(34.dp)
-                        ) {
-                            Text("Scan", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                        }
+                } else if (allTransactions.isEmpty()) {
+                    item {
+                        NewUserGuidanceCard(
+                            onAddTransactionClick = onAddNewTransaction,
+                            onLoadSampleDataClick = { viewModel.restoreSeedData() }
+                        )
                     }
                 }
-            }
 
-            item {
-                RecentTransactionsCard(
-                    transactions = displayedTransactions.take(5),
-                    onViewAllClick = onNavigateToTransactions,
-                    onDeleteTransaction = { viewModel.deleteTransaction(it) }
-                )
-            }
+                item {
+                    AccountChipsRow(
+                        accounts = accounts,
+                        balances = accountBalances,
+                        onManageAccountsClick = { showManageAccountsDialog = true }
+                    )
+                }
 
-            item {
-                Spacer(modifier = Modifier.height(90.dp))
+                item {
+                    MonthlySummaryCard(
+                        selectedMonth = selectedMonth,
+                        income = monthlyIncome,
+                        expense = monthlyExpense,
+                        net = monthlyNet,
+                        categoryBreakdown = categoryBreakdown,
+                        onPrevMonth = { viewModel.changeMonth(-1) },
+                        onNextMonth = { viewModel.changeMonth(1) }
+                    )
+                }
+
+                // Kutipan Finansial Dinamis (Berubah Otomatis Tiap Jam)
+                item {
+                    RotatableFinancialQuoteCard(
+                        advice = financialAdvice
+                    )
+                }
+
+                if (financialAdvice.warnings.isNotEmpty()) {
+                    item {
+                        WarningBannersSection(
+                            warnings = financialAdvice.warnings
+                        )
+                    }
+                }
+
+                item {
+                    RecentTransactionsCard(
+                        transactions = displayedTransactions.take(5),
+                        onViewAllClick = onNavigateToTransactions,
+                        onDeleteTransaction = { viewModel.deleteTransaction(it) }
+                    )
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(90.dp))
+                }
             }
         }
     }
@@ -360,17 +378,6 @@ fun HomeScreen(
             },
             onDeleteAccount = { accId ->
                 viewModel.deleteAccount(accId)
-            }
-        )
-    }
-
-    if (showScanReceiptDialog) {
-        ScanReceiptDialog(
-            accounts = accounts,
-            onDismiss = { showScanReceiptDialog = false },
-            onConfirmExpense = { desc, amount, account, category, date ->
-                viewModel.addTransaction("out", desc, amount, account, category, date)
-                showScanReceiptDialog = false
             }
         )
     }

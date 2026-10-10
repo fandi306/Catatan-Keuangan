@@ -4,8 +4,10 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,18 +26,15 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -65,17 +64,19 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.example.data.model.Account
-import com.example.ui.theme.ExpenseRed
 import com.example.ui.theme.GoldTarget
 import com.example.ui.theme.IncomeGreen
 import com.example.ui.theme.NavyHero
 import com.example.ui.theme.NavyHeroDark
 import com.example.util.Formatters
+import com.example.util.GeminiReceiptHelper
 import com.example.util.ReceiptScanner
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+import com.example.util.BudgetCategoryHelper
+
+private val SCAN_CATEGORIES = BudgetCategoryHelper.CATEGORY_NAMES
+
 @Composable
 fun ScanReceiptDialog(
     accounts: List<Account>,
@@ -88,6 +89,8 @@ fun ScanReceiptDialog(
 
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var isAnalyzing by remember { mutableStateOf(false) }
+    var isAiPowered by remember { mutableStateOf(false) }
+    var analysisNotes by remember { mutableStateOf("") }
     var detectedSuccess by remember { mutableStateOf(false) }
 
     // Editable parsed fields
@@ -107,38 +110,25 @@ fun ScanReceiptDialog(
             selectedImageUri = uri
             isAnalyzing = true
             detectedSuccess = false
+            errorMessage = null
 
             coroutineScope.launch {
-                // Simulate smart image analysis/OCR
-                delay(1200)
-                isAnalyzing = false
-
-                // Process filename or preset smart defaults
-                val fileName = uri.lastPathSegment ?: ""
-                val sampleOcrText = """
-                    KEDAI KOPI & RESTO NIKMAT
-                    Jl. Sudirman No. 42
-                    ========================
-                    1x Nasi Goreng Spesial   28.000
-                    1x Es Teh Manis           6.000
-                    1x French Fries          15.000
-                    ------------------------
-                    SUBTOTAL                 49.000
-                    PB1 10%                   4.900
-                    TOTAL BAYAR              53.900
-                    TUNAI                    60.000
-                    KEMBALI                   6.100
-                    ========================
-                    Terima Kasih Atas Kunjungan Anda
-                """.trimIndent()
-
-                val parsed = ReceiptScanner.parseReceiptText(sampleOcrText)
-                description = parsed.merchantOrTitle
-                rawAmount = Formatters.formatRupiah(parsed.amount).replace("Rp", "").trim()
-                selectedCategory = parsed.category
-                selectedDate = parsed.date
-                manualTextInput = sampleOcrText
-                detectedSuccess = true
+                try {
+                    val result = GeminiReceiptHelper.analyzeReceipt(context, uri)
+                    description = result.merchant
+                    if (result.amount > 0L) {
+                        rawAmount = Formatters.formatNumber(result.amount)
+                    }
+                    selectedCategory = if (result.category in SCAN_CATEGORIES) result.category else "Makan"
+                    selectedDate = result.date
+                    isAiPowered = result.isAiPowered
+                    analysisNotes = result.notes
+                    detectedSuccess = true
+                } catch (e: Exception) {
+                    errorMessage = "Gagal memproses nota: ${e.message}"
+                } finally {
+                    isAnalyzing = false
+                }
             }
         }
     }
@@ -153,7 +143,7 @@ fun ScanReceiptDialog(
         ) {
             Column(
                 modifier = Modifier
-                    .padding(22.dp)
+                    .padding(20.dp)
                     .verticalScroll(rememberScrollState())
             ) {
                 // Header
@@ -166,7 +156,7 @@ fun ScanReceiptDialog(
                         Surface(
                             shape = CircleShape,
                             color = GoldTarget.copy(alpha = 0.18f),
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(38.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
@@ -179,14 +169,41 @@ fun ScanReceiptDialog(
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Scan Nota Otomatis",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(10.dp),
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Text(
+                                            text = "AI Ready",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
                             Text(
-                                text = "Scan Nota / Struk",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Otomatisasi pengeluaran dari foto nota",
+                                text = "Pindai foto struk belanja untuk isi data otomatis",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -194,42 +211,42 @@ fun ScanReceiptDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Upload Box / Photo Preview
                 if (selectedImageUri == null) {
                     Surface(
                         shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                         border = CardDefaults.outlinedCardBorder(),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(20.dp),
+                                .padding(18.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ReceiptLong,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(44.dp)
+                                modifier = Modifier.size(40.dp)
                             )
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Pilih Foto Nota dari Galeri atau Kamera",
+                                text = "Pilih Foto Struk / Nota",
                                 style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Aplikasi akan membaca total belanja & merchant secara otomatis",
+                                text = "AI akan membaca total, nama toko, dan tanggal otomatis",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
-                            Spacer(modifier = Modifier.height(14.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(
@@ -259,10 +276,9 @@ fun ScanReceiptDialog(
                         }
                     }
                 } else {
-                    // Image selected, show preview & status
                     Card(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
                         border = CardDefaults.outlinedCardBorder(),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -274,7 +290,7 @@ fun ScanReceiptDialog(
                                 model = selectedImageUri,
                                 contentDescription = "Foto Nota",
                                 modifier = Modifier
-                                    .size(68.dp)
+                                    .size(64.dp)
                                     .clip(RoundedCornerShape(10.dp)),
                                 contentScale = ContentScale.Crop
                             )
@@ -289,7 +305,7 @@ fun ScanReceiptDialog(
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = "Menganalisis teks nota...",
+                                            text = "Memindai dengan AI...",
                                             style = MaterialTheme.typography.bodySmall,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary
@@ -298,24 +314,27 @@ fun ScanReceiptDialog(
                                 } else if (detectedSuccess) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(
-                                            imageVector = Icons.Default.CheckCircle,
+                                            imageVector = if (isAiPowered) Icons.Default.AutoAwesome else Icons.Default.CheckCircle,
                                             contentDescription = null,
-                                            tint = IncomeGreen,
+                                            tint = if (isAiPowered) MaterialTheme.colorScheme.primary else IncomeGreen,
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "Nota Berhasil Terbaca!",
+                                            text = if (isAiPowered) "Terbaca oleh Gemini AI ✨" else "Nota Terbaca",
                                             style = MaterialTheme.typography.bodySmall,
                                             fontWeight = FontWeight.Bold,
-                                            color = IncomeGreen
+                                            color = if (isAiPowered) MaterialTheme.colorScheme.primary else IncomeGreen
                                         )
                                     }
-                                    Text(
-                                        text = "Data telah otomatis terisi. Silakan periksa kembali sebelum menyimpan.",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    if (analysisNotes.isNotBlank()) {
+                                        Text(
+                                            text = analysisNotes,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1
+                                        )
+                                    }
                                 }
 
                                 Spacer(modifier = Modifier.height(4.dp))
@@ -325,46 +344,47 @@ fun ScanReceiptDialog(
                                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                         )
                                     },
-                                    modifier = Modifier.height(28.dp)
+                                    modifier = Modifier.height(26.dp)
                                 ) {
-                                    Text("Ganti Foto Nota", fontSize = 11.sp)
+                                    Text("Ganti Foto", fontSize = 11.sp)
                                 }
                             }
                         }
                     }
                 }
 
-                // Paste Text OCR fallback/override
                 if (showManualTextMode) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     OutlinedTextField(
                         value = manualTextInput,
                         onValueChange = {
                             manualTextInput = it
                             val parsed = ReceiptScanner.parseReceiptText(it)
                             if (parsed.amount > 0) {
-                                rawAmount = Formatters.formatRupiah(parsed.amount).replace("Rp", "").trim()
+                                rawAmount = Formatters.formatNumber(parsed.amount)
                             }
                             if (parsed.merchantOrTitle.isNotBlank()) {
                                 description = parsed.merchantOrTitle
                             }
-                            selectedCategory = parsed.category
+                            if (parsed.category in SCAN_CATEGORIES) {
+                                selectedCategory = parsed.category
+                            }
                             selectedDate = parsed.date
                             detectedSuccess = true
                         },
                         label = { Text("Teks / Salinan Struk") },
                         placeholder = { Text("Paste struk belanja / invoice di sini...") },
                         modifier = Modifier.fillMaxWidth(),
-                        maxLines = 4,
+                        maxLines = 3,
                         shape = RoundedCornerShape(12.dp)
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Editable Fields: Keterangan / Toko
+                // Editable Toko / Merchant
                 Text(
-                    text = "Nama Toko / Keterangan Belanja",
+                    text = "Nama Toko / Keterangan",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -373,7 +393,7 @@ fun ScanReceiptDialog(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    placeholder = { Text("Contoh: Kopi Kenangan / Indomaret") },
+                    placeholder = { Text("Contoh: Indomaret / Kedai Kopi") },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -381,11 +401,11 @@ fun ScanReceiptDialog(
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // Editable Amount
+                // Total Amount
                 Text(
-                    text = "Total Nominal Pengeluaran (Rp)",
+                    text = "Total Pembayaran (Rp)",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -393,8 +413,16 @@ fun ScanReceiptDialog(
                 Spacer(modifier = Modifier.height(4.dp))
                 OutlinedTextField(
                     value = rawAmount,
-                    onValueChange = { rawAmount = it },
-                    placeholder = { Text("Contoh: 53.900") },
+                    onValueChange = { input ->
+                        val digits = input.filter { it.isDigit() }
+                        rawAmount = if (digits.isNotBlank()) {
+                            val parsed = digits.toLongOrNull() ?: 0L
+                            Formatters.formatNumber(parsed)
+                        } else {
+                            ""
+                        }
+                    },
+                    placeholder = { Text("Contoh: 54.000") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier
@@ -403,26 +431,75 @@ fun ScanReceiptDialog(
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(6.dp))
+                // Quick amount adjust buttons (+10k, +20k, +50k, +100k)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(10_000L, 20_000L, 50_000L, 100_000L).forEach { addVal ->
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    val current = Formatters.parseAmount(rawAmount)
+                                    val next = current + addVal
+                                    rawAmount = Formatters.formatNumber(next)
+                                }
+                        ) {
+                            Text(
+                                text = "+${addVal / 1000}rb",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
 
-                // Pilih Kategori
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Kategori (aligned with OJK guide)
                 Text(
-                    text = "Kategori Pengeluaran",
+                    text = "Kategori Pengeluaran (Panduan OJK)",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    listOf("Makan", "Belanja", "Transportasi", "Kesehatan").forEach { cat ->
-                        val isSelected = selectedCategory == cat
+                    BudgetCategoryHelper.ALL_CATEGORIES.forEach { catMeta ->
+                        val isSelected = selectedCategory == catMeta.name
                         FilterChip(
                             selected = isSelected,
-                            onClick = { selectedCategory = cat },
-                            label = { Text(cat, fontSize = 11.sp) },
+                            onClick = { selectedCategory = catMeta.name },
+                            label = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("${catMeta.emoji} ${catMeta.name}", fontSize = 11.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = catMeta.group.color.copy(alpha = if (isSelected) 0.35f else 0.15f)
+                                    ) {
+                                        Text(
+                                            text = catMeta.group.badge,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected && isDark) Color.White else catMeta.group.color,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                }
+                            },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = if (isDark) GoldTarget.copy(alpha = 0.25f) else NavyHero.copy(alpha = 0.12f),
                                 selectedLabelColor = if (isDark) GoldTarget else NavyHero
@@ -431,9 +508,9 @@ fun ScanReceiptDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // Pilih Akun / Dompet Pembayaran
+                // Dompet Pembayaran
                 Text(
                     text = "Bayar Menggunakan Dompet:",
                     style = MaterialTheme.typography.labelMedium,
@@ -442,10 +519,12 @@ fun ScanReceiptDialog(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    accounts.take(3).forEach { acc ->
+                    accounts.forEach { acc ->
                         val isSelected = selectedAccount == acc.name
                         FilterChip(
                             selected = isSelected,
@@ -468,9 +547,9 @@ fun ScanReceiptDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Actions: Batal & Masukkan Pengeluaran
+                // Actions: Batal & Catat Otomatis
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -520,7 +599,7 @@ fun ScanReceiptDialog(
                             .height(48.dp)
                             .testTag("btn_save_scanned_receipt")
                     ) {
-                        Text("Catat Otomatis", fontWeight = FontWeight.Bold)
+                        Text("Catat Transaksi", fontWeight = FontWeight.Bold)
                     }
                 }
             }

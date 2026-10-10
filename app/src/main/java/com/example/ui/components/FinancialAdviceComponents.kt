@@ -170,13 +170,7 @@ fun RotatableFinancialQuoteCard(
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
-    var quoteMode by remember { mutableStateOf("hourly") } // "hourly" or "daily"
-
-    val activeQuote: FinancialQuote = if (quoteMode == "hourly") {
-        advice.hourlyQuote
-    } else {
-        advice.dailyQuote
-    }
+    val activeQuote: FinancialQuote = advice.hourlyQuote
 
     val cardBg = if (isDark) Color(0xFF1B233D) else Color(0xFFF1F5FD)
     val accentColor = when (activeQuote.category) {
@@ -211,38 +205,41 @@ fun RotatableFinancialQuoteCard(
                                 imageVector = Icons.Default.FormatQuote,
                                 contentDescription = null,
                                 tint = accentColor,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (quoteMode == "hourly") "Kutipan Tiap Jam" else "Kutipan Tiap Hari",
+                        text = "Kutipan Finansial",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = accentColor
                     )
                 }
 
-                // Switch Hourly / Daily
-                SingleChoiceSegmentedButtonRow {
-                    SegmentedButton(
-                        selected = quoteMode == "hourly",
-                        onClick = { quoteMode = "hourly" },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                Surface(
+                    shape = RoundedCornerShape(99.dp),
+                    color = accentColor.copy(alpha = 0.12f)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(12.dp))
+                        Icon(
+                            imageVector = Icons.Default.Schedule,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(12.dp)
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Tiap Jam", fontSize = 11.sp)
-                    }
-                    SegmentedButton(
-                        selected = quoteMode == "daily",
-                        onClick = { quoteMode = "daily" },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                    ) {
-                        Icon(Icons.Default.Today, contentDescription = null, modifier = Modifier.size(12.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Tiap Hari", fontSize = 11.sp)
+                        Text(
+                            text = "Otomatis Tiap Jam",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = accentColor,
+                            fontSize = 10.sp
+                        )
                     }
                 }
             }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -163,21 +164,7 @@ fun ProfileScreen(
     val displayPhotoModel = ProfilePhotoHelper.resolveImageModel(rawPhotoUri)
     val presetEmoji = ProfilePhotoHelper.getPresetEmoji(rawPhotoUri)
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.TopCenter
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .widthIn(max = 720.dp)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp)
-                .testTag("profile_screen")
-        ) {
-        // Top Bar
+    val topBarSection: @Composable () -> Unit = {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -200,10 +187,10 @@ fun ProfileScreen(
                 color = MaterialTheme.colorScheme.onBackground
             )
         }
+    }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Profile Card with Photo Sync, Preset Avatars, & Gallery Picker
+    // Profile Card with Photo Sync, Preset Avatars, & Gallery Picker
+    val profileCardSection: @Composable () -> Unit = {
         Card(
             shape = RoundedCornerShape(22.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -285,7 +272,7 @@ fun ProfileScreen(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Photo Actions: Ganti, Emot HP, & Hapus
+                        // Photo Actions: Galeri & Hapus (hapus duplikasi tombol Emot HP)
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -308,22 +295,6 @@ fun ProfileScreen(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("Galeri", style = MaterialTheme.typography.labelSmall)
-                            }
-
-                            OutlinedButton(
-                                onClick = { showCustomEmojiDialog = true },
-                                shape = RoundedCornerShape(99.dp),
-                                modifier = Modifier
-                                    .height(34.dp)
-                                    .testTag("btn_custom_emoji_avatar")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.SentimentSatisfiedAlt,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Emot HP", style = MaterialTheme.typography.labelSmall)
                             }
 
                             if (rawPhotoUri != null && rawPhotoUri.isNotBlank()) {
@@ -350,7 +321,7 @@ fun ProfileScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Avatar Options: Quick Preset & Emoticon Sendiri
+                // Avatar Options: Quick Preset & Single Emoticon HP Button (tanpa tombol duplikat)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -362,16 +333,20 @@ fun ProfileScreen(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    TextButton(
+                    OutlinedButton(
                         onClick = { showCustomEmojiDialog = true },
-                        modifier = Modifier.height(28.dp)
+                        shape = RoundedCornerShape(99.dp),
+                        modifier = Modifier
+                            .height(30.dp)
+                            .testTag("btn_custom_emoji_avatar")
                     ) {
-                        Text(
-                            text = "+ Input Emot Sendiri",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                        Icon(
+                            imageVector = Icons.Default.SentimentSatisfiedAlt,
+                            contentDescription = null,
+                            modifier = Modifier.size(13.dp)
                         )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Pilih Emot HP", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
                 Spacer(modifier = Modifier.height(6.dp))
@@ -403,6 +378,55 @@ fun ProfileScreen(
                                 )
                             }
                         }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Ruang Khusus Bio & Catatan Keuangan Pribadi
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("📝", fontSize = 14.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Bio & Catatan Keuangan",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            TextButton(
+                                onClick = { showEditProfileDialog = true },
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Text(
+                                    text = if (userProfile?.bio.isNullOrBlank()) "+ Tambah Bio" else "Ubah Bio",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (!userProfile?.bio.isNullOrBlank()) {
+                                userProfile?.bio ?: ""
+                            } else {
+                                "Target tabungan: bebas finansial | Tuliskan impian finansial atau moto hemat Anda di sini."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (!userProfile?.bio.isNullOrBlank()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            lineHeight = 18.sp
+                        )
                     }
                 }
 
@@ -465,10 +489,10 @@ fun ProfileScreen(
                 }
             }
         }
+    }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Developer / Creator Bio Card (Click to Open Full Details)
+    // Developer / Creator Bio Card (Click to Open Full Details)
+    val creatorCardSection: @Composable () -> Unit = {
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -541,10 +565,10 @@ fun ProfileScreen(
                 }
             }
         }
+    }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Device Sync Explanation
+    // Device Sync Explanation
+    val syncExplanationSection: @Composable () -> Unit = {
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -576,18 +600,17 @@ fun ProfileScreen(
                 )
             }
         }
+    }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Theme & Preferences Section
-        Text(
-            text = "Tema Tampilan",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
+    // Theme & Preferences Section
+    val themeSection: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                text = "Tema Tampilan",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
 
         Card(
             shape = RoundedCornerShape(20.dp),
@@ -660,18 +683,18 @@ fun ProfileScreen(
                 }
             }
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Financial Settings & Management
-        Text(
-            text = "Pengaturan Keuangan",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
+    // Financial Settings & Management
+    val financeSettingsSection: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                text = "Pengaturan Keuangan",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
 
         Card(
             shape = RoundedCornerShape(20.dp),
@@ -751,18 +774,18 @@ fun ProfileScreen(
                 }
             }
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Data Reset Section
-        Text(
-            text = "Menu Reset & Pemulihan Data",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
+    // Data Reset Section
+    val resetRestoreSection: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                text = "Menu Reset & Pemulihan Data",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
 
         Card(
             shape = RoundedCornerShape(20.dp),
@@ -845,10 +868,11 @@ fun ProfileScreen(
                 }
             }
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Account Actions: Ganti Akun & Keluar
+    // Account Actions: Ganti Akun & Keluar
+    val accountActionsSection: @Composable () -> Unit = {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -899,10 +923,81 @@ fun ProfileScreen(
                 )
             }
         }
-
-        Spacer(modifier = Modifier.height(70.dp))
     }
-}
+
+    // Responsive layout: 2-column on tablet / wide screen, single column on phone
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        val isTablet = maxWidth >= 720.dp
+
+        if (isTablet) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .widthIn(max = 1040.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 20.dp)
+                    .testTag("profile_screen")
+            ) {
+                topBarSection()
+                Spacer(modifier = Modifier.height(20.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        profileCardSection()
+                        creatorCardSection()
+                        syncExplanationSection()
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        themeSection()
+                        financeSettingsSection()
+                        resetRestoreSection()
+                        accountActionsSection()
+                    }
+                }
+                Spacer(modifier = Modifier.height(70.dp))
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .widthIn(max = 680.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
+                    .testTag("profile_screen")
+            ) {
+                topBarSection()
+                Spacer(modifier = Modifier.height(16.dp))
+                profileCardSection()
+                Spacer(modifier = Modifier.height(16.dp))
+                creatorCardSection()
+                Spacer(modifier = Modifier.height(16.dp))
+                syncExplanationSection()
+                Spacer(modifier = Modifier.height(16.dp))
+                themeSection()
+                Spacer(modifier = Modifier.height(16.dp))
+                financeSettingsSection()
+                Spacer(modifier = Modifier.height(16.dp))
+                resetRestoreSection()
+                Spacer(modifier = Modifier.height(24.dp))
+                accountActionsSection()
+                Spacer(modifier = Modifier.height(70.dp))
+            }
+        }
+    }
 
     // Confirmation Dialog for Logout
     if (showLogoutConfirmationDialog) {

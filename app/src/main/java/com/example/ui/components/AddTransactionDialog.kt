@@ -65,16 +65,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-val DEFAULT_CATEGORIES = listOf(
-    "Makan",
-    "Kebutuhan Kos",
-    "Pengeluaran Darurat",
-    "Pembayaran Lainnya",
-    "Transportasi",
-    "Hiburan",
-    "Belanja",
-    "Kesehatan"
-)
+import com.example.util.BudgetCategoryHelper
+import com.example.util.BudgetGroup
+
+val DEFAULT_CATEGORIES = BudgetCategoryHelper.CATEGORY_NAMES
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -313,12 +307,18 @@ fun AddTransactionDialog(
                     // Category chips (Only for expense)
                     if (type == "out") {
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "Kategori Pengeluaran",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Kategori Pengeluaran (Sesuai Panduan OJK)",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                         Spacer(modifier = Modifier.height(6.dp))
                         Row(
                             modifier = Modifier
@@ -326,17 +326,35 @@ fun AddTransactionDialog(
                                 .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            for (cat in DEFAULT_CATEGORIES) {
+                            for (catMeta in BudgetCategoryHelper.ALL_CATEGORIES) {
+                                val isSelected = selectedCategory == catMeta.name
                                 FilterChip(
-                                    selected = selectedCategory == cat,
-                                    onClick = { selectedCategory = cat },
-                                    label = { Text(cat) },
+                                    selected = isSelected,
+                                    onClick = { selectedCategory = catMeta.name },
+                                    label = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text("${catMeta.emoji} ${catMeta.name}", fontSize = 12.sp)
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = catMeta.group.color.copy(alpha = if (isSelected) 0.35f else 0.15f)
+                                            ) {
+                                                Text(
+                                                    text = catMeta.group.badge,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isSelected && isDark) Color.White else catMeta.group.color,
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                )
+                                            }
+                                        }
+                                    },
                                     shape = RoundedCornerShape(99.dp),
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = primaryButtonBg,
                                         selectedLabelColor = primaryButtonContent
                                     ),
-                                    modifier = Modifier.testTag("chip_cat_$cat")
+                                    modifier = Modifier.testTag("chip_cat_${catMeta.name}")
                                 )
                             }
                         }

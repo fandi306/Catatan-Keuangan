@@ -66,24 +66,42 @@ object ReceiptScanner {
 
         // 2. Extract Total Amount
         var detectedAmount = 0L
-        val totalKeywords = listOf(
-            "grand total", "total akhir", "total bayar", "total", "sub total",
-            "subtotal", "jumlah bayar", "jumlah", "tagihan", "netto", "tunai", "cash", "rp", "bayar"
+        // Primary total keywords (Actual bill amount)
+        val primaryTotalKeywords = listOf(
+            "grand total", "total akhir", "total bayar", "jumlah bayar", "netto", "total"
+        )
+        val secondaryKeywords = listOf(
+            "sub total", "subtotal", "tagihan", "jumlah"
         )
 
-        // First pass: look for lines explicitly mentioning total keywords
-        for (line in lines.reversed()) {
+        // First pass: Look for explicit bill total keywords, ignoring lines that are tender payment (tunai/cash/kembali)
+        for (line in lines) {
             val lower = line.lowercase(Locale.ROOT)
-            for (kw in totalKeywords) {
-                if (lower.contains(kw)) {
+            if (lower.contains("kembali") || lower.contains("change")) continue
+            for (kw in primaryTotalKeywords) {
+                if (lower.contains(kw) && !lower.contains("item") && !lower.contains("qty")) {
                     val extracted = extractLargestNumberFromLine(line)
                     if (extracted > 500L && extracted > detectedAmount) {
                         detectedAmount = extracted
-                        break
                     }
                 }
             }
-            if (detectedAmount > 0) break
+        }
+
+        // Secondary pass if no primary total found
+        if (detectedAmount == 0L) {
+            for (line in lines) {
+                val lower = line.lowercase(Locale.ROOT)
+                if (lower.contains("kembali") || lower.contains("change")) continue
+                for (kw in secondaryKeywords) {
+                    if (lower.contains(kw)) {
+                        val extracted = extractLargestNumberFromLine(line)
+                        if (extracted > 500L && extracted > detectedAmount) {
+                            detectedAmount = extracted
+                        }
+                    }
+                }
+            }
         }
 
         // Second pass: if keyword-based search didn't find, look for all numbers in text and pick the most reasonable maximum

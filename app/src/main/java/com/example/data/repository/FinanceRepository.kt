@@ -28,17 +28,13 @@ class FinanceRepository(private val db: FirebaseFirestore) {
     companion object {
         private fun provideFirestore(context: Context): FirebaseFirestore {
             com.example.CatatanKeuanganApp.initFirebase(context)
-            val resId = context.applicationContext.resources.getIdentifier("firestore_database_id", "string", context.packageName)
-            val dbId = if (resId != 0) context.applicationContext.getString(resId) else null
-            return if (dbId != null && dbId.isNotBlank()) {
-                try {
-                    FirebaseFirestore.getInstance(dbId)
-                } catch (_: Exception) {
-                    FirebaseFirestore.getInstance()
-                }
-            } else {
-                FirebaseFirestore.getInstance()
+            val dbId = try {
+                context.applicationContext.getString(R.string.firestore_database_id)
+            } catch (_: Exception) {
+                val resId = context.applicationContext.resources.getIdentifier("firestore_database_id", "string", context.packageName)
+                if (resId != 0) context.applicationContext.getString(resId) else "ai-studio-android-catatank-763f3866-4bd3-4cc5-ab9d-0003c2152def"
             }
+            return FirebaseFirestore.getInstance(dbId)
         }
     }
 

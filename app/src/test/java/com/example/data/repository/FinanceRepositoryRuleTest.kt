@@ -59,6 +59,7 @@ class FinanceRepositoryRuleTest : FirestoreEmulatorTestBase() {
         val repo = FinanceRepository(firestore)
 
         repo.seedInitialDataIfEmpty(uid, displayName = "Fandi Ahmad", email = "fandi@test.com")
+        repo.seedSampleAccountsIfEmpty(uid)
 
         val accounts = repo.observeAccounts(uid).first()
         assertTrue(accounts.size >= 5)

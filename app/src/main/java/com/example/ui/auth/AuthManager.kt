@@ -24,6 +24,14 @@ object AuthManager {
     private const val TAG = "AuthManager"
 
     private fun getWebClientId(context: Context): String? {
+        val directValue = try {
+            val v = context.getString(R.string.default_web_client_id)
+            if (v.isNotBlank() && v != "default_web_client_id") v else null
+        } catch (_: Exception) {
+            null
+        }
+        if (directValue != null) return directValue
+
         val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
         if (resId != 0) {
             val value = context.getString(resId)

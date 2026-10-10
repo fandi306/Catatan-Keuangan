@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,16 +14,24 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,10 +46,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.isSystemInDarkTheme
-import com.example.ui.theme.NavySurfaceDark
 import com.example.ui.theme.GoldTarget
 import com.example.ui.theme.NavyHero
+import com.example.ui.theme.NavySurfaceDark
 import com.example.util.Formatters
 
 @Composable
@@ -79,6 +87,8 @@ fun HeroCard(
         label = "nonLiquidAsset"
     )
 
+    var selectedAssetType by remember { mutableStateOf("liquid") } // "liquid" or "non_liquid"
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -90,7 +100,7 @@ fun HeroCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(22.dp)
+            modifier = Modifier.padding(20.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -155,13 +165,12 @@ fun HeroCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(44.dp)
             ) {
                 Canvas(modifier = Modifier.matchParentSize()) {
                     val width = size.width
                     val height = size.height
 
-                    // Dynamic control points representing achievement slope
                     val progressRatio = animatedProgress.coerceIn(0.05f, 1f)
                     val p0 = Offset(0f, height * 0.85f)
                     val p1 = Offset(width * 0.35f, height * 0.70f)
@@ -180,7 +189,6 @@ fun HeroCard(
                         close()
                     }
 
-                    // Soft gradient under curve
                     drawPath(
                         path = fillPath,
                         brush = Brush.verticalGradient(
@@ -193,14 +201,12 @@ fun HeroCard(
                         )
                     )
 
-                    // Curve stroke
                     drawPath(
                         path = path,
                         color = GoldTarget,
                         style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
                     )
 
-                    // End indicator pulse point
                     drawCircle(
                         color = GoldTarget,
                         radius = 4.5.dp.toPx(),
@@ -233,7 +239,7 @@ fun HeroCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -267,67 +273,94 @@ fun HeroCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Split 2 columns: Liquid and Non-Liquid assets with in-column explanations
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            // User preference: Pilih salah satu saja antara Aset Lancar vs Tidak Lancar agar hemat ruang layar HP
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.White.copy(alpha = 0.1f))
-                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                SegmentedButton(
+                    selected = selectedAssetType == "liquid",
+                    onClick = { selectedAssetType = "liquid" },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    colors = SegmentedButtonDefaults.colors(
+                        activeContainerColor = Color.White.copy(alpha = 0.22f),
+                        activeContentColor = Color.White,
+                        inactiveContainerColor = Color.Transparent,
+                        inactiveContentColor = Color(0xFFC7D0F5)
+                    )
                 ) {
-                    Column {
-                        Text(
-                            text = "Aset Lancar / Liquid Asset",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFD6DCFC),
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "(Cash, tabungan, e-wallet, dll.)",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFA5B2E6),
-                            fontSize = 10.sp
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = Formatters.formatRupiah(animatedLiquidAsset.toLong()),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    Text("Liquid Aset", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.White.copy(alpha = 0.1f))
-                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                SegmentedButton(
+                    selected = selectedAssetType == "non_liquid",
+                    onClick = { selectedAssetType = "non_liquid" },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    colors = SegmentedButtonDefaults.colors(
+                        activeContainerColor = Color.White.copy(alpha = 0.22f),
+                        activeContentColor = Color.White,
+                        inactiveContainerColor = Color.Transparent,
+                        inactiveContentColor = Color(0xFFC7D0F5)
+                    )
                 ) {
-                    Column {
+                    Text("Non-Liquid Aset", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Display ONLY the selected asset breakdown (short, concise, non-cluttered)
+            val isLiquid = selectedAssetType == "liquid"
+            val displayAssetAmount = if (isLiquid) animatedLiquidAsset.toLong() else animatedNonLiquidAsset.toLong()
+            val assetPercentage = if (totalAsset > 0) {
+                ((displayAssetAmount.toFloat() / totalAsset.toFloat()) * 100f).toInt()
+            } else 0
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White.copy(alpha = 0.12f))
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (isLiquid) "Liquid Aset" else "Non-Liquid Aset",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFE2E7FF),
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = GoldTarget.copy(alpha = 0.2f)
+                            ) {
+                                Text(
+                                    text = "$assetPercentage% aset",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = GoldTarget,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
                         Text(
-                            text = "Aset Tdk Lancar / Non-Liquid",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFD6DCFC),
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "(Handphone, emas, aset, dll.)",
+                            text = if (isLiquid) "Kas tunai, rekening bank, e-wallet" else "Gadget, kendaraan, barang berharga, aset fisik",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color(0xFFA5B2E6),
                             fontSize = 10.sp
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = Formatters.formatRupiah(animatedNonLiquidAsset.toLong()),
+                            text = Formatters.formatRupiah(displayAssetAmount),
                             style = MaterialTheme.typography.titleMedium,
                             color = Color.White,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.ExtraBold
                         )
                     }
                 }

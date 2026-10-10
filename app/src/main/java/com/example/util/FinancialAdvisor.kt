@@ -128,22 +128,27 @@ object FinancialAdvisor {
     ): FinancialAdvice {
         val warnings = mutableListOf<FinancialWarning>()
 
-        val foodExpense = categoryBreakdown.find { it.first.equals("Makan", ignoreCase = true) }?.second ?: 0L
-        val debtExpense = categoryBreakdown.filter {
-            it.first.contains("Cicilan", ignoreCase = true) ||
-            it.first.contains("Utang", ignoreCase = true) ||
-            it.first.contains("Tagihan", ignoreCase = true)
+        val basicNeedsExpense = categoryBreakdown.filter {
+            BudgetCategoryHelper.getGroupForCategory(it.first) == BudgetGroup.POKOK
         }.sumOf { it.second }
+
+        val debtExpense = categoryBreakdown.filter {
+            BudgetCategoryHelper.getGroupForCategory(it.first) == BudgetGroup.CICILAN
+        }.sumOf { it.second }
+
+        val directSavingsExpense = categoryBreakdown.filter {
+            BudgetCategoryHelper.getGroupForCategory(it.first) == BudgetGroup.TABUNGAN
+        }.sumOf { it.second }
+
         val socialExpense = categoryBreakdown.filter {
-            it.first.contains("Donasi", ignoreCase = true) ||
-            it.first.contains("Amal", ignoreCase = true) ||
-            it.first.contains("Sosial", ignoreCase = true) ||
-            it.first.contains("Sedekah", ignoreCase = true)
+            BudgetCategoryHelper.getGroupForCategory(it.first) == BudgetGroup.SOSIAL
         }.sumOf { it.second }
 
         val net = income - expense
 
         val baseForPercent = if (income > 0) income else expense
+
+        val foodExpense = categoryBreakdown.filter { it.first.contains("Makan", ignoreCase = true) }.sumOf { it.second }
 
         val foodPct = if (baseForPercent > 0) {
             (foodExpense.toFloat() / baseForPercent.toFloat()) * 100f
@@ -241,37 +246,60 @@ object FinancialAdvisor {
         val dailyQuote = HOURLY_QUOTES[dayOfYear % HOURLY_QUOTES.size]
 
         // 4. Panduan & Tips Rumus 40-30-20-10 (Saran OJK / untuk Pengendalian Utang)
+        val basicPct = if (income > 0) {
+            ((basicNeedsExpense.toFloat() / income.toFloat()) * 100f).toInt()
+        } else if (expense > 0) {
+            ((basicNeedsExpense.toFloat() / expense.toFloat()) * 100f).toInt()
+        } else 0
+
+        val debtPct = if (income > 0) {
+            ((debtExpense.toFloat() / income.toFloat()) * 100f).toInt()
+        } else if (expense > 0) {
+            ((debtExpense.toFloat() / expense.toFloat()) * 100f).toInt()
+        } else 0
+
+        val effectiveSavings = (net.coerceAtLeast(0) + directSavingsExpense)
+        val savingsEffPct = if (income > 0) {
+            ((effectiveSavings.toFloat() / income.toFloat()) * 100f).toInt()
+        } else 0
+
+        val socialPct = if (income > 0) {
+            ((socialExpense.toFloat() / income.toFloat()) * 100f).toInt()
+        } else if (expense > 0) {
+            ((socialExpense.toFloat() / expense.toFloat()) * 100f).toInt()
+        } else 0
+
         val ojkTips = listOf(
             BudgetRuleTip(
                 title = "Biaya Hidup & Kebutuhan Pokok",
                 idealPercentage = "40%",
-                currentPercentage = if (income > 0) "${((expense - debtExpense - socialExpense).coerceAtLeast(0).toFloat() / income.toFloat() * 100f).toInt()}%" else "${foodPct.toInt()}%",
-                status = if (income > 0 && (expense - debtExpense - socialExpense) > income * 0.45f) "OVER" else "OK",
-                advice = "Mencakup makanan, tempat tinggal/kos, listrik, air, dan transportasi harian. Porsi maksimal 40% agar pos tabungan dan cicilan aman.",
+                currentPercentage = "$basicPct%",
+                status = if (basicPct > 45) "OVER" else "OK",
+                advice = "Kategori: Makan, Kos, Belanja Bulanan, Transport, Kesehatan. Terpakai: ${Formatters.formatRupiah(basicNeedsExpense)}. Rekomendasi maksimal 40% agar pos tabungan dan cicilan tetap aman.",
                 formulaBadge = "40% Pokok"
             ),
             BudgetRuleTip(
                 title = "Cicilan & Pembayaran Utang",
                 idealPercentage = "Maksimal 30%",
-                currentPercentage = if (income > 0 && debtExpense > 0) "${(debtExpense.toFloat() / income.toFloat() * 100f).toInt()}%" else "0%",
-                status = if (income > 0 && debtExpense > income * 0.30f) "OVER" else "OK",
-                advice = "Saran OJK: Batas maksimal seluruh cicilan atau utang adalah 30% dari penghasilan bulanan untuk mencegah gagal bayar.",
+                currentPercentage = "$debtPct%",
+                status = if (debtPct > 30) "OVER" else "OK",
+                advice = "Kategori: Cicilan & Kredit, Tagihan & Utang. Terpakai: ${Formatters.formatRupiah(debtExpense)}. Saran OJK: Batas maksimal seluruh cicilan adalah 30% dari pendapatan.",
                 formulaBadge = "30% Cicilan"
             ),
             BudgetRuleTip(
                 title = "Tabungan & Investasi",
                 idealPercentage = "Minimal 20%",
-                currentPercentage = "${savingsPct.toInt()}%",
-                status = if (savingsPct >= 20f || income == 0L) "OK" else "BELOW",
-                advice = "Sisihkan langsung di awal gajian untuk dana darurat, tabungan masa depan, dan portofolio investasi terpercaya.",
+                currentPercentage = "$savingsEffPct%",
+                status = if (savingsEffPct >= 20 || income == 0L) "OK" else "BELOW",
+                advice = "Kategori: Tabungan Masa Depan, Investasi, Dana Darurat. Terkumpul: ${Formatters.formatRupiah(effectiveSavings)}. Sisihkan minimal 20% langsung saat gajian.",
                 formulaBadge = "20% Tabungan"
             ),
             BudgetRuleTip(
-                title = "Donasi, Amal & Kegiatan Sosial",
+                title = "Donasi, Amal & Gaya Hidup",
                 idealPercentage = "10%",
-                currentPercentage = if (income > 0 && socialExpense > 0) "${(socialExpense.toFloat() / income.toFloat() * 100f).toInt()}%" else "Tercatat",
-                status = "OK",
-                advice = "Alokasikan 10% untuk kegiatan sosial, zakat, infak, atau berbagi kepada sesama demi menjaga keberkahan dan kepedulian.",
+                currentPercentage = "$socialPct%",
+                status = if (socialPct >= 5 || socialExpense > 0) "OK" else "BELOW",
+                advice = "Kategori: Donasi, Sedekah, Hiburan, Sosial & Kado. Terpakai: ${Formatters.formatRupiah(socialExpense)}. Alokasikan hingga 10% untuk kepedulian sosial & rekreasi terukur.",
                 formulaBadge = "10% Donasi"
             )
         )
