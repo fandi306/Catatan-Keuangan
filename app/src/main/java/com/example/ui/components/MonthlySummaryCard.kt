@@ -1,9 +1,9 @@
 package com.example.ui.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -80,15 +80,17 @@ fun MonthlySummaryCard(
     val expenseCardBg = if (isDark) ExpenseRedDarkBg else ExpenseRedBg
     val expenseTextColor = if (isDark) ExpenseRedDark else ExpenseRed
 
+    val animSpec = remember { tween<Float>(durationMillis = 300, easing = FastOutSlowInEasing) }
+
     val animatedIncome by animateFloatAsState(
         targetValue = income.toFloat(),
-        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        animationSpec = animSpec,
         label = "animIncome"
     )
 
     val animatedExpense by animateFloatAsState(
         targetValue = expense.toFloat(),
-        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        animationSpec = animSpec,
         label = "animExpense"
     )
 
@@ -551,7 +553,7 @@ fun MonthlySummaryCard(
 
                         val animatedFraction by animateFloatAsState(
                             targetValue = fraction,
-                            animationSpec = spring(stiffness = Spring.StiffnessLow),
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
                             label = "catFraction_$category"
                         )
 

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lightbulb
@@ -30,7 +31,9 @@ import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -38,11 +41,15 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import com.example.util.OnlineQuoteManager
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -170,7 +177,14 @@ fun RotatableFinancialQuoteCard(
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
-    val activeQuote: FinancialQuote = advice.hourlyQuote
+    val currentOnlineQuote by OnlineQuoteManager.currentQuote.collectAsState()
+
+    // Gunakan kutipan relevan dari status keuangan saat defisit/target tercapai, atau kutipan terkurasi
+    val activeQuote: FinancialQuote = if (advice.hourlyQuote.category == "DEFICIT" || advice.hourlyQuote.category == "TARGET_ACHIEVED") {
+        advice.hourlyQuote
+    } else {
+        currentOnlineQuote
+    }
 
     val cardBg = if (isDark) Color(0xFF1B233D) else Color(0xFFF1F5FD)
     val accentColor = when (activeQuote.category) {
@@ -191,57 +205,29 @@ fun RotatableFinancialQuoteCard(
         Column(modifier = Modifier.padding(18.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        shape = CircleShape,
-                        color = accentColor.copy(alpha = 0.15f),
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.FormatQuote,
-                                contentDescription = null,
-                                tint = accentColor,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Kutipan Finansial",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = accentColor
-                    )
-                }
-
                 Surface(
-                    shape = RoundedCornerShape(99.dp),
-                    color = accentColor.copy(alpha = 0.12f)
+                    shape = CircleShape,
+                    color = accentColor.copy(alpha = 0.15f),
+                    modifier = Modifier.size(28.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
+                    Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = Icons.Default.Schedule,
+                            imageVector = Icons.Default.FormatQuote,
                             contentDescription = null,
                             tint = accentColor,
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Otomatis Tiap Jam",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = accentColor,
-                            fontSize = 10.sp
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Kutipan Finansial",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = accentColor
+                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))

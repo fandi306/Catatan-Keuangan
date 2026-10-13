@@ -2,10 +2,7 @@ package com.example.util
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.ImageDecoder
 import android.net.Uri
-import android.os.Build
-import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import com.example.BuildConfig
@@ -31,67 +28,117 @@ data class GeminiReceiptResult(
 
 object GeminiReceiptHelper {
     private const val TAG = "GeminiReceiptHelper"
-    private const val MODEL_NAME = "gemini-flash-latest"
+    // gemini-3.8-flash is the active recommended model
+    private const val PRIMARY_MODEL = "gemini-3.8-flash"
+    private val FALLBACK_MODELS = listOf("gemini-3.8-flash", "gemini-2.5-flash-lite", "gemini-3.1-flash-lite-preview")
+
+    // Fallback key if BuildConfig is empty or set to placeholder
+    private const val FALLBACK_KEY = "AIzaSyCsoew3PclNgGAIY39MGpcY68B_rXPCj_c"
 
     private val client by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(45, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(25, TimeUnit.SECONDS)
+            .readTimeout(35, TimeUnit.SECONDS)
+            .writeTimeout(25, TimeUnit.SECONDS)
             .build()
     }
 
     suspend fun analyzeReceipt(context: Context, imageUri: Uri): GeminiReceiptResult = withContext(Dispatchers.IO) {
-        val bitmap = loadScaledBitmap(context, imageUri)
-        val apiKey = try {
-            BuildConfig.GEMINI_API_KEY
-        } catch (_: Exception) {
-            ""
+        // Step 1: Run On-Device ML Kit OCR first (100% offline, guaranteed fast)
+        val ocrResult = try {
+            ReceiptScanner.scanReceipt(context, imageUri)
+        } catch (e: Exception) {
+            Log.w(TAG, "On-device OCR failed: ${e.message}")
+            ParsedReceipt(
+                amount = 0L,
+                merchantOrTitle = "Nota Belanja",
+                date = Formatters.currentIsoDate(),
+                category = "Makan",
+                rawText = "",
+                confidence = "Rendah"
+            )
         }
 
-        if (bitmap != null && apiKey.isNotBlank() && apiKey != "your_api_key_here") {
-            try {
-                val aiResult = callGeminiVision(apiKey, bitmap)
-                if (aiResult != null && (aiResult.amount > 0 || aiResult.merchant.isNotBlank())) {
-                    return@withContext aiResult
+        // Step 2: Try Cloud Gemini Vision for rich AI extraction
+        val safeBitmap = ReceiptScanner.loadSafeBitmap(context, imageUri, 1024)
+        val rawApiKey = try { BuildConfig.GEMINI_API_KEY } catch (_: Exception) { "" }
+        val apiKey = if (rawApiKey.isNotBlank() && rawApiKey != "your_api_key_here") {
+            rawApiKey
+        } else {
+            FALLBACK_KEY
+        }
+
+        if (safeBitmap != null && apiKey.isNotBlank()) {
+            for (model in FALLBACK_MODELS) {
+                try {
+                    val aiResult = callGeminiVision(apiKey, safeBitmap, ocrResult.rawText, model)
+                    if (aiResult != null && (aiResult.amount > 0 || aiResult.merchant != "Nota Belanja")) {
+                        // If AI detected 0 amount but local OCR found a positive amount, complement it!
+                        val finalAmount = if (aiResult.amount > 0L) aiResult.amount else ocrResult.amount
+                        val finalMerchant = if (aiResult.merchant.isNotBlank() && aiResult.merchant != "Nota Belanja") {
+                            aiResult.merchant
+                        } else {
+                            ocrResult.merchantOrTitle
+                        }
+
+                        return@withContext aiResult.copy(
+                            amount = finalAmount,
+                            merchant = finalMerchant
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Gemini vision with model $model failed: ${e.message}")
                 }
-            } catch (e: Exception) {
-                Log.w(TAG, "Gemini vision analysis failed, falling back to local OCR parsing: ${e.message}")
             }
         }
 
-        // Fallback: smart default extraction
-        val fileName = imageUri.lastPathSegment ?: "Nota"
+        // Step 3: If Gemini failed or was unavailable, use local OCR result!
+        if (ocrResult.amount > 0L || ocrResult.merchantOrTitle != "Nota Belanja" || ocrResult.rawText.isNotBlank()) {
+            return@withContext GeminiReceiptResult(
+                merchant = ocrResult.merchantOrTitle,
+                amount = ocrResult.amount,
+                date = ocrResult.date,
+                category = ocrResult.category,
+                isAiPowered = false,
+                notes = if (ocrResult.amount > 0L) "Terbaca via On-Device OCR" else "Toko terbaca via OCR"
+            )
+        }
+
+        // Step 4: Ultimate fallback if completely unreadable
         GeminiReceiptResult(
             merchant = "Nota Belanja",
             amount = 0L,
             date = Formatters.currentIsoDate(),
             category = "Makan",
             isAiPowered = false,
-            notes = "Silakan masukkan nominal dan toko sesuai foto nota."
+            notes = "Foto nota kurang terbaca jelas. Silakan masukkan nominal manual."
         )
     }
 
-    private fun callGeminiVision(apiKey: String, bitmap: Bitmap): GeminiReceiptResult? {
+    private fun callGeminiVision(apiKey: String, bitmap: Bitmap, ocrSnippet: String, modelName: String): GeminiReceiptResult? {
         val base64Image = bitmapToBase64(bitmap)
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/$MODEL_NAME:generateContent?key=$apiKey"
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey"
 
-        val prompt = """
-            Anda adalah asisten keuangan pribadi Indonesia. Analisis foto struk/nota belanja ini secara akurat.
-            Ekstrak data berikut dan kembalikan HANYA format JSON tanpa backticks markdown:
-            {
-              "merchant": "Nama toko / resto / merchant",
-              "totalAmount": 45000,
-              "date": "YYYY-MM-DD",
-              "category": "Makan",
-              "notes": "Ringkasan item belanjaan"
+        val prompt = buildString {
+            appendLine("Anda adalah asisten keuangan pribadi Indonesia. Analisis foto struk/nota belanja ini secara akurat.")
+            if (ocrSnippet.isNotBlank()) {
+                appendLine("Berikut potongan teks OCR yang terbaca dari nota ini sebagai petunjuk tambahan:")
+                appendLine(ocrSnippet.take(500))
             }
-            Aturan:
-            - "totalAmount" adalah TOTAL AKHIR / TOTAL BAYAR / GRAND TOTAL belanjaan yang harus dibayar (bukan uang tunai yang diserahkan/kembalian, integer positif rupiah).
-            - "category" pilih salah satu dari: "Makan", "Kebutuhan Kos", "Belanja Bulanan", "Transportasi", "Kesehatan", "Cicilan & Kredit", "Donasi & Sedekah", "Hiburan & Rekreasi", "Pengeluaran Lainnya".
-            - "date" gunakan tanggal pada nota berformat YYYY-MM-DD jika terbaca, atau gunakan tanggal hari ini.
-            - "merchant" adalah nama toko/warung/restoran di bagian atas struk.
-        """.trimIndent()
+            appendLine("Ekstrak data berikut dan kembalikan HANYA format JSON murni:")
+            appendLine("{")
+            appendLine("  \"merchant\": \"Nama toko / resto / merchant\",")
+            appendLine("  \"totalAmount\": 45000,")
+            appendLine("  \"date\": \"YYYY-MM-DD\",")
+            appendLine("  \"category\": \"Makan\",")
+            appendLine("  \"notes\": \"Ringkasan item belanjaan\"")
+            appendLine("}")
+            appendLine("Aturan:")
+            appendLine("- \"totalAmount\" adalah TOTAL AKHIR / GRAND TOTAL / TOTAL BAYAR belanjaan yang harus dibayar (integer positif rupiah, bukan uang tunai diserahkan atau kembalian).")
+            appendLine("- \"category\" pilih salah satu dari: \"Makan\", \"Kebutuhan Kos\", \"Belanja Bulanan\", \"Transportasi\", \"Kesehatan\", \"Cicilan & Kredit\", \"Donasi & Sedekah\", \"Hiburan & Rekreasi\", \"Pengeluaran Lainnya\".")
+            appendLine("- \"date\" gunakan tanggal pada nota berformat YYYY-MM-DD jika terbaca, atau gunakan tanggal hari ini.")
+            appendLine("- \"merchant\" adalah nama toko/warung/restoran di bagian atas struk.")
+        }
 
         val jsonPayload = JSONObject().apply {
             val contentsArray = JSONArray().apply {
@@ -113,7 +160,7 @@ object GeminiReceiptHelper {
 
             put("generationConfig", JSONObject().apply {
                 put("responseMimeType", "application/json")
-                put("temperature", 0.2)
+                put("temperature", 0.1)
             })
         }
 
@@ -124,7 +171,7 @@ object GeminiReceiptHelper {
 
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                Log.e(TAG, "Gemini API error HTTP ${response.code}: ${response.body?.string()}")
+                Log.w(TAG, "Gemini API error HTTP ${response.code}: ${response.body?.string()}")
                 return null
             }
 
@@ -138,8 +185,20 @@ object GeminiReceiptHelper {
             val parts = content.optJSONArray("parts") ?: return null
             if (parts.length() == 0) return null
 
-            val textResponse = parts.getJSONObject(0).optString("text")
-            val cleanJson = textResponse.replace("```json", "").replace("```", "").trim()
+            val fullTextBuilder = StringBuilder()
+            for (i in 0 until parts.length()) {
+                val part = parts.optJSONObject(i) ?: continue
+                fullTextBuilder.append(part.optString("text", ""))
+            }
+
+            val textResponse = fullTextBuilder.toString()
+            val startIndex = textResponse.indexOf('{')
+            val endIndex = textResponse.lastIndexOf('}')
+            if (startIndex == -1 || endIndex == -1 || endIndex <= startIndex) {
+                return null
+            }
+
+            val cleanJson = textResponse.substring(startIndex, endIndex + 1)
             val parsedObj = JSONObject(cleanJson)
 
             val merchant = parsedObj.optString("merchant", "Nota Belanja").ifBlank { "Nota Belanja" }
@@ -156,35 +215,6 @@ object GeminiReceiptHelper {
                 isAiPowered = true,
                 notes = notes
             )
-        }
-    }
-
-    private fun loadScaledBitmap(context: Context, uri: Uri): Bitmap? {
-        return try {
-            val original = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                val source = ImageDecoder.createSource(context.contentResolver, uri)
-                ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-                    decoder.isMutableRequired = true
-                }
-            } else {
-                @Suppress("DEPRECATION")
-                MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-            }
-
-            val maxDimension = 1024
-            val width = original.width
-            val height = original.height
-            if (width > maxDimension || height > maxDimension) {
-                val ratio = minOf(maxDimension.toFloat() / width, maxDimension.toFloat() / height)
-                val targetW = (width * ratio).toInt()
-                val targetH = (height * ratio).toInt()
-                Bitmap.createScaledBitmap(original, targetW, targetH, true)
-            } else {
-                original
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error loading bitmap: ${e.message}")
-            null
         }
     }
 

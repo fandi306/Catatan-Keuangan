@@ -318,7 +318,7 @@ fun AnalyticsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Asset Allocation Card (Lancar vs Tidak Lancar)
+        // Asset Allocation Card (Liquid Aset vs Non-Liquid Aset)
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -389,7 +389,7 @@ fun AnalyticsScreen(
                         Spacer(modifier = Modifier.width(6.dp))
                         Column {
                             Text(
-                                text = "Liquid Asset (${liquidPct.toInt()}%)",
+                                text = "Liquid Aset (${liquidPct.toInt()}%)",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -426,7 +426,7 @@ fun AnalyticsScreen(
                         Spacer(modifier = Modifier.width(6.dp))
                         Column {
                             Text(
-                                text = "Non-Liquid Asset (${nonLiquidPct.toInt()}%)",
+                                text = "Non-Liquid Aset (${nonLiquidPct.toInt()}%)",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface

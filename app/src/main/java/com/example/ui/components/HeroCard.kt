@@ -1,10 +1,12 @@
 package com.example.ui.components
 
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -60,34 +62,43 @@ fun HeroCard(
     targetProgressPct: Float,
     onEditTargetClick: () -> Unit,
     onViewAnalyticsClick: () -> Unit = {},
+    showSparklineCurve: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
+
+    // Animasi ringan dan cepat khusus untuk HP kentang (tanpa kalkulasi pegas berat)
+    val animSpec = remember { tween<Float>(durationMillis = 300, easing = FastOutSlowInEasing) }
+
     val animatedProgress by animateFloatAsState(
         targetValue = (targetProgressPct / 100f).coerceIn(0f, 1f),
-        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        animationSpec = animSpec,
         label = "targetProgress"
     )
 
     val animatedTotalAsset by animateFloatAsState(
         targetValue = totalAsset.toFloat(),
-        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        animationSpec = animSpec,
         label = "totalAsset"
     )
 
     val animatedLiquidAsset by animateFloatAsState(
         targetValue = liquidAsset.toFloat(),
-        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        animationSpec = animSpec,
         label = "liquidAsset"
     )
 
     val animatedNonLiquidAsset by animateFloatAsState(
         targetValue = nonLiquidAsset.toFloat(),
-        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        animationSpec = animSpec,
         label = "nonLiquidAsset"
     )
 
     var selectedAssetType by remember { mutableStateOf("liquid") } // "liquid" or "non_liquid"
+
+    // Kontras warna tegas agar di tablet tidak menyatu dengan background layar
+    val cardContainerColor = if (isDark) Color(0xFF141C34) else NavyHero
+    val cardBorderColor = if (isDark) Color(0xFF2E3D66) else Color(0xFF25345C)
 
     Card(
         modifier = modifier
@@ -95,9 +106,10 @@ fun HeroCard(
             .testTag("hero_total_asset_card"),
         shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isDark) NavySurfaceDark else NavyHero
+            containerColor = cardContainerColor
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        border = BorderStroke(1.dp, cardBorderColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
             modifier = Modifier.padding(20.dp)
@@ -159,68 +171,70 @@ fun HeroCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            if (showSparklineCurve) {
+                Spacer(modifier = Modifier.height(10.dp))
 
-            // Mini Achievement Curve Canvas (Eye-catching lightweight sparkline)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(44.dp)
-            ) {
-                Canvas(modifier = Modifier.matchParentSize()) {
-                    val width = size.width
-                    val height = size.height
+                // Mini Achievement Curve Canvas (Eye-catching lightweight sparkline)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                ) {
+                    Canvas(modifier = Modifier.matchParentSize()) {
+                        val width = size.width
+                        val height = size.height
 
-                    val progressRatio = animatedProgress.coerceIn(0.05f, 1f)
-                    val p0 = Offset(0f, height * 0.85f)
-                    val p1 = Offset(width * 0.35f, height * 0.70f)
-                    val p2 = Offset(width * 0.70f, height * (0.85f - (0.50f * progressRatio)))
-                    val p3 = Offset(width, height * (0.90f - (0.80f * progressRatio)))
+                        val progressRatio = animatedProgress.coerceIn(0.05f, 1f)
+                        val p0 = Offset(0f, height * 0.85f)
+                        val p1 = Offset(width * 0.35f, height * 0.70f)
+                        val p2 = Offset(width * 0.70f, height * (0.85f - (0.50f * progressRatio)))
+                        val p3 = Offset(width, height * (0.90f - (0.80f * progressRatio)))
 
-                    val path = Path().apply {
-                        moveTo(p0.x, p0.y)
-                        cubicTo(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y)
-                    }
+                        val path = Path().apply {
+                            moveTo(p0.x, p0.y)
+                            cubicTo(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y)
+                        }
 
-                    val fillPath = Path().apply {
-                        addPath(path)
-                        lineTo(width, height)
-                        lineTo(0f, height)
-                        close()
-                    }
+                        val fillPath = Path().apply {
+                            addPath(path)
+                            lineTo(width, height)
+                            lineTo(0f, height)
+                            close()
+                        }
 
-                    drawPath(
-                        path = fillPath,
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                GoldTarget.copy(alpha = 0.25f),
-                                Color.Transparent
-                            ),
-                            startY = 0f,
-                            endY = height
+                        drawPath(
+                            path = fillPath,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    GoldTarget.copy(alpha = 0.25f),
+                                    Color.Transparent
+                                ),
+                                startY = 0f,
+                                endY = height
+                            )
                         )
-                    )
 
-                    drawPath(
-                        path = path,
-                        color = GoldTarget,
-                        style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
-                    )
+                        drawPath(
+                            path = path,
+                            color = GoldTarget,
+                            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                        )
 
-                    drawCircle(
-                        color = GoldTarget,
-                        radius = 4.5.dp.toPx(),
-                        center = p3
-                    )
-                    drawCircle(
-                        color = Color.White,
-                        radius = 2.dp.toPx(),
-                        center = p3
-                    )
+                        drawCircle(
+                            color = GoldTarget,
+                            radius = 4.5.dp.toPx(),
+                            center = p3
+                        )
+                        drawCircle(
+                            color = Color.White,
+                            radius = 2.dp.toPx(),
+                            center = p3
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Progress bar
             Box(
@@ -273,7 +287,7 @@ fun HeroCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // User preference: Pilih salah satu saja antara Aset Lancar vs Tidak Lancar agar hemat ruang layar HP
+            // User preference: Pilih salah satu saja antara Liquid Aset vs Non-Liquid Aset agar hemat ruang layar HP
             SingleChoiceSegmentedButtonRow(
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -319,6 +333,7 @@ fun HeroCard(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
                     .background(Color.White.copy(alpha = 0.12f))
+                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(16.dp))
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
                 Row(

@@ -117,7 +117,7 @@ fun AccountManagementDialog(
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Text(
-                                            text = if (acc.isLiquid) "Liquid Asset (Aset Lancar) · ${Formatters.formatRupiah(bal)}" else "Non-Liquid Asset (Aset Tdk Lancar) · ${Formatters.formatRupiah(bal)}",
+                                            text = if (acc.isLiquid) "Liquid Aset · ${Formatters.formatRupiah(bal)}" else "Non-Liquid Aset · ${Formatters.formatRupiah(bal)}",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -185,7 +185,7 @@ fun AccountManagementDialog(
                         onClick = { newAccountType = "liquid" },
                         shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
                     ) {
-                        Text("Liquid (Lancar)", fontSize = 12.sp)
+                        Text("Liquid Aset", fontSize = 12.sp)
                     }
 
                     SegmentedButton(
@@ -193,7 +193,7 @@ fun AccountManagementDialog(
                         onClick = { newAccountType = "non_liquid" },
                         shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                     ) {
-                        Text("Non-Liquid (Tdk Lancar)", fontSize = 12.sp)
+                        Text("Non-Liquid Aset", fontSize = 12.sp)
                     }
                 }
 

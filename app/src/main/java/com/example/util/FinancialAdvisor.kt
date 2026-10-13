@@ -6,7 +6,8 @@ data class FinancialQuote(
     val quote: String,
     val author: String,
     val category: String, // "DEFICIT", "TARGET_ACHIEVED", "TARGET_NEAR", "SAVING", "OJK_FORMULA", "GENERAL"
-    val tip: String
+    val tip: String,
+    val isOnline: Boolean = false
 )
 
 data class FinancialWarning(
@@ -43,81 +44,8 @@ data class BudgetRuleTip(
 
 object FinancialAdvisor {
 
-    // Pool quotes terkurasi untuk rotasi harian & per jam
-    private val HOURLY_QUOTES = listOf(
-        FinancialQuote(
-            quote = "Jangan menabung apa yang tersisa setelah dibelanjakan, tapi belanjakan apa yang tersisa setelah menabung.",
-            author = "Warren Buffett",
-            category = "SAVING",
-            tip = "Gunakan metode 'Pay Yourself First': sisihkan tabungan di awal gajian sebelum mulai membelanjakannya."
-        ),
-        FinancialQuote(
-            quote = "Waspadalah terhadap pengeluaran kecil; kebocoran kecil bisa menenggelamkan kapal yang besar.",
-            author = "Benjamin Franklin",
-            category = "GENERAL",
-            tip = "Jajan kopi dan delivery harian seringkali menjadi pengeluaran terbesar yang tidak disadari."
-        ),
-        FinancialQuote(
-            quote = "Kemenangan finansial bukanlah tentang sekali lompatan besar, melainkan serangkaian kebiasaan kecil yang konsisten.",
-            author = "James Clear",
-            category = "TARGET_NEAR",
-            tip = "Konsistensi mencatat setiap rupiah adalah langkah awal kestabilan keuangan pribadi."
-        ),
-        FinancialQuote(
-            quote = "Disiplin finansial hari ini adalah kemerdekaan finansial di masa depan.",
-            author = "Dave Ramsey",
-            category = "TARGET_ACHIEVED",
-            tip = "Rayakan setiap capaian keuangan dengan memperkuat dana darurat dan investasi."
-        ),
-        FinancialQuote(
-            quote = "Bukan berapa banyak uang yang kamu hasilkan, tapi berapa banyak uang yang kamu simpan.",
-            author = "Robert Kiyosaki",
-            category = "SAVING",
-            tip = "Kenaikan penghasilan hendaknya diikuti kenaikan tabungan, bukan kenaikan gaya hidup semata."
-        ),
-        FinancialQuote(
-            quote = "Kekayaan sejati bukanlah memiliki banyak harta benda, melainkan memiliki sedikit keinginan konsumtif.",
-            author = "Epictetus",
-            category = "GENERAL",
-            tip = "Terapkan jeda 24 jam sebelum checkout keranjang belanja online untuk menghindari impulse buying."
-        ),
-        FinancialQuote(
-            quote = "Anggaran bukanlah rantai yang membelenggu, melainkan kompas yang memberi kebebasan finansial tanpa rasa bersalah.",
-            author = "John C. Maxwell",
-            category = "OJK_FORMULA",
-            tip = "Patuhi rumus 40-30-20-10 OJK agar hidup tenang tanpa jeratan beban utang berlebihan."
-        ),
-        FinancialQuote(
-            quote = "Orang cerdas mengendalikan uangnya, orang lalai dikendalikan oleh uang dan nafsu belanjanya.",
-            author = "Pribahasa Finansial",
-            category = "DEFICIT",
-            tip = "Jika bulan ini defisit, segera audit pengeluaran non-primer dan tunda pembelian barang tersier."
-        ),
-        FinancialQuote(
-            quote = "Investasi terbaik yang bisa kamu lakukan adalah investasi pada ketenangan pikiran finansialmu.",
-            author = "Charlie Munger",
-            category = "SAVING",
-            tip = "Alokasikan 20% penghasilan ke tabungan dan instrumen investasi yang terdaftar resmi di OJK."
-        ),
-        FinancialQuote(
-            quote = "Tangan di atas lebih baik daripada tangan di bawah; berbagi tidak akan membuat hartamu berkurang.",
-            author = "Pepatah Bijak",
-            category = "OJK_FORMULA",
-            tip = "Alokasikan 10% untuk donasi, zakat, amal, atau kegiatan sosial demi keberkahan rezeki."
-        ),
-        FinancialQuote(
-            quote = "Utang konsumtif membeli kesenangan sesaat dengan menggadaikan masa depan.",
-            author = "Morgan Housel",
-            category = "OJK_FORMULA",
-            tip = "Pastikan cicilan atau utang maksimal 30% dari pemasukan agar arus kas bulanan tetap sehat."
-        ),
-        FinancialQuote(
-            quote = "Mengetahui ke mana uangmu pergi jauh lebih melegakan daripada bertanya-tanya ke mana ia hilang.",
-            author = "Anonim",
-            category = "GENERAL",
-            tip = "Buka aplikasi Catatan Keuangan secara rutin setiap kali selesai bertransaksi."
-        )
-    )
+    // Menggunakan pool masif 35+ quotes terkurasi dan sinkronisasi server online
+    private val HOURLY_QUOTES get() = OnlineQuoteManager.CURATED_QUOTES
 
     fun evaluate(
         income: Long,

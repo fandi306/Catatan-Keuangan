@@ -20,6 +20,14 @@ enum class AppLanguage(val code: String, val displayName: String) {
     ENGLISH("en", "English")
 }
 
+data class HomeScreenSettings(
+    val showQuotes: Boolean = true,
+    val showAccountChips: Boolean = true,
+    val showFinancialWarnings: Boolean = true,
+    val showRecentTransactions: Boolean = true,
+    val showSparklineCurve: Boolean = true
+)
+
 class AppPreferences(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("catatan_uang_prefs", Context.MODE_PRIVATE)
@@ -39,6 +47,17 @@ class AppPreferences(context: Context) {
     )
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
 
+    private val _homeSettings = MutableStateFlow(
+        HomeScreenSettings(
+            showQuotes = prefs.getBoolean(KEY_SHOW_QUOTES, true),
+            showAccountChips = prefs.getBoolean(KEY_SHOW_ACCOUNT_CHIPS, true),
+            showFinancialWarnings = prefs.getBoolean(KEY_SHOW_WARNINGS, true),
+            showRecentTransactions = prefs.getBoolean(KEY_SHOW_RECENT_TX, true),
+            showSparklineCurve = prefs.getBoolean(KEY_SHOW_SPARKLINE, true)
+        )
+    )
+    val homeSettings: StateFlow<HomeScreenSettings> = _homeSettings.asStateFlow()
+
     fun setThemeMode(mode: AppThemeMode) {
         _themeMode.value = mode
         prefs.edit().putString(KEY_THEME, mode.name).apply()
@@ -49,9 +68,62 @@ class AppPreferences(context: Context) {
         prefs.edit().putString(KEY_LANG, lang.code).apply()
     }
 
+    fun updateHomeScreenSettings(newSettings: HomeScreenSettings) {
+        _homeSettings.value = newSettings
+        prefs.edit()
+            .putBoolean(KEY_SHOW_QUOTES, newSettings.showQuotes)
+            .putBoolean(KEY_SHOW_ACCOUNT_CHIPS, newSettings.showAccountChips)
+            .putBoolean(KEY_SHOW_WARNINGS, newSettings.showFinancialWarnings)
+            .putBoolean(KEY_SHOW_RECENT_TX, newSettings.showRecentTransactions)
+            .putBoolean(KEY_SHOW_SPARKLINE, newSettings.showSparklineCurve)
+            .apply()
+    }
+
+    fun setShowQuotes(enabled: Boolean) {
+        updateHomeScreenSettings(_homeSettings.value.copy(showQuotes = enabled))
+    }
+
+    fun setShowAccountChips(enabled: Boolean) {
+        updateHomeScreenSettings(_homeSettings.value.copy(showAccountChips = enabled))
+    }
+
+    fun setShowFinancialWarnings(enabled: Boolean) {
+        updateHomeScreenSettings(_homeSettings.value.copy(showFinancialWarnings = enabled))
+    }
+
+    fun setShowRecentTransactions(enabled: Boolean) {
+        updateHomeScreenSettings(_homeSettings.value.copy(showRecentTransactions = enabled))
+    }
+
+    fun setShowSparklineCurve(enabled: Boolean) {
+        updateHomeScreenSettings(_homeSettings.value.copy(showSparklineCurve = enabled))
+    }
+
+    fun resetHomeSettingsToDefault() {
+        updateHomeScreenSettings(HomeScreenSettings())
+    }
+
+    fun setSuperCleanMode() {
+        updateHomeScreenSettings(
+            HomeScreenSettings(
+                showQuotes = false,
+                showAccountChips = false,
+                showFinancialWarnings = false,
+                showRecentTransactions = false,
+                showSparklineCurve = false
+            )
+        )
+    }
+
     companion object {
         private const val KEY_THEME = "app_theme_mode"
         private const val KEY_LANG = "app_language"
+
+        private const val KEY_SHOW_QUOTES = "home_show_quotes"
+        private const val KEY_SHOW_ACCOUNT_CHIPS = "home_show_account_chips"
+        private const val KEY_SHOW_WARNINGS = "home_show_warnings"
+        private const val KEY_SHOW_RECENT_TX = "home_show_recent_tx"
+        private const val KEY_SHOW_SPARKLINE = "home_show_sparkline"
 
         @Volatile
         private var INSTANCE: AppPreferences? = null

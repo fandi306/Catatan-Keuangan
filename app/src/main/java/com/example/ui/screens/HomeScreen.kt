@@ -57,11 +57,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.util.AppPreferences
 import coil.compose.AsyncImage
 import com.example.R
 import com.example.ui.components.AccountChipsRow
@@ -117,6 +119,10 @@ fun HomeScreen(
     var showEditTargetDialog by remember { mutableStateOf(false) }
     var showManageAccountsDialog by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
+    val appPreferences = remember { AppPreferences.getInstance(context) }
+    val homeSettings by appPreferences.homeSettings.collectAsState()
+
     val rawName = userProfile?.displayName?.ifBlank { null }
         ?: currentUser?.displayName?.ifBlank { null }
         ?: "Fandi"
@@ -147,14 +153,82 @@ fun HomeScreen(
                 }
 
                 item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(18.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        // Left Column: Hero Total Asset + Monthly Summary Chart
+                    val hasRightColumn = homeSettings.showAccountChips ||
+                            homeSettings.showQuotes ||
+                            (homeSettings.showFinancialWarnings && financialAdvice.warnings.isNotEmpty()) ||
+                            (homeSettings.showRecentTransactions && displayedTransactions.isNotEmpty())
+
+                    if (hasRightColumn) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(18.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            // Left Column: Hero Total Asset + Monthly Summary Chart (Inti Utama - Tidak Disembunyikan)
+                            Column(
+                                modifier = Modifier.weight(1.1f),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                HeroCard(
+                                    totalAsset = totalAsset,
+                                    liquidAsset = liquidAsset,
+                                    nonLiquidAsset = nonLiquidAsset,
+                                    savingsTarget = savingsTarget,
+                                    targetProgressPct = targetProgressPct,
+                                    onEditTargetClick = { showEditTargetDialog = true },
+                                    onViewAnalyticsClick = onNavigateToAnalytics,
+                                    showSparklineCurve = homeSettings.showSparklineCurve
+                                )
+
+                                MonthlySummaryCard(
+                                    selectedMonth = selectedMonth,
+                                    income = monthlyIncome,
+                                    expense = monthlyExpense,
+                                    net = monthlyNet,
+                                    categoryBreakdown = categoryBreakdown,
+                                    onPrevMonth = { viewModel.changeMonth(-1) },
+                                    onNextMonth = { viewModel.changeMonth(1) }
+                                )
+                            }
+
+                            // Right Column: Dompet & Akun, Kutipan Finansial, Warnings, Transaksi Terkini
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                if (homeSettings.showAccountChips) {
+                                    AccountChipsRow(
+                                        accounts = accounts,
+                                        balances = accountBalances,
+                                        onManageAccountsClick = { showManageAccountsDialog = true }
+                                    )
+                                }
+
+                                if (homeSettings.showQuotes) {
+                                    RotatableFinancialQuoteCard(
+                                        advice = financialAdvice
+                                    )
+                                }
+
+                                if (homeSettings.showFinancialWarnings && financialAdvice.warnings.isNotEmpty()) {
+                                    WarningBannersSection(
+                                        warnings = financialAdvice.warnings
+                                    )
+                                }
+
+                                if (homeSettings.showRecentTransactions) {
+                                    RecentTransactionsCard(
+                                        transactions = displayedTransactions.take(6),
+                                        onViewAllClick = onNavigateToTransactions,
+                                        onDeleteTransaction = { viewModel.deleteTransaction(it) }
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        // Clean Mode on Tablet: Kolom terpusat rapi dan elegan
                         Column(
-                            modifier = Modifier.weight(1.1f),
+                            modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             HeroCard(
@@ -164,7 +238,8 @@ fun HomeScreen(
                                 savingsTarget = savingsTarget,
                                 targetProgressPct = targetProgressPct,
                                 onEditTargetClick = { showEditTargetDialog = true },
-                                onViewAnalyticsClick = onNavigateToAnalytics
+                                onViewAnalyticsClick = onNavigateToAnalytics,
+                                showSparklineCurve = homeSettings.showSparklineCurve
                             )
 
                             MonthlySummaryCard(
@@ -175,34 +250,6 @@ fun HomeScreen(
                                 categoryBreakdown = categoryBreakdown,
                                 onPrevMonth = { viewModel.changeMonth(-1) },
                                 onNextMonth = { viewModel.changeMonth(1) }
-                            )
-                        }
-
-                        // Right Column: Dompet & Akun, Kutipan Finansial, Warnings, Transaksi Terkini
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            AccountChipsRow(
-                                accounts = accounts,
-                                balances = accountBalances,
-                                onManageAccountsClick = { showManageAccountsDialog = true }
-                            )
-
-                            RotatableFinancialQuoteCard(
-                                advice = financialAdvice
-                            )
-
-                            if (financialAdvice.warnings.isNotEmpty()) {
-                                WarningBannersSection(
-                                    warnings = financialAdvice.warnings
-                                )
-                            }
-
-                            RecentTransactionsCard(
-                                transactions = displayedTransactions.take(6),
-                                onViewAllClick = onNavigateToTransactions,
-                                onDeleteTransaction = { viewModel.deleteTransaction(it) }
                             )
                         }
                     }
@@ -237,7 +284,8 @@ fun HomeScreen(
                         savingsTarget = savingsTarget,
                         targetProgressPct = targetProgressPct,
                         onEditTargetClick = { showEditTargetDialog = true },
-                        onViewAnalyticsClick = onNavigateToAnalytics
+                        onViewAnalyticsClick = onNavigateToAnalytics,
+                        showSparklineCurve = homeSettings.showSparklineCurve
                     )
                 }
 
@@ -307,14 +355,17 @@ fun HomeScreen(
                     }
                 }
 
-                item {
-                    AccountChipsRow(
-                        accounts = accounts,
-                        balances = accountBalances,
-                        onManageAccountsClick = { showManageAccountsDialog = true }
-                    )
+                if (homeSettings.showAccountChips) {
+                    item {
+                        AccountChipsRow(
+                            accounts = accounts,
+                            balances = accountBalances,
+                            onManageAccountsClick = { showManageAccountsDialog = true }
+                        )
+                    }
                 }
 
+                // Ringkasan Bulanan (Inti Utama - Tidak Disembunyikan)
                 item {
                     MonthlySummaryCard(
                         selectedMonth = selectedMonth,
@@ -327,14 +378,16 @@ fun HomeScreen(
                     )
                 }
 
-                // Kutipan Finansial Dinamis (Berubah Otomatis Tiap Jam)
-                item {
-                    RotatableFinancialQuoteCard(
-                        advice = financialAdvice
-                    )
+                // Kutipan Finansial Dinamis (Bisa disembunyikan via Kustomisasi Profil)
+                if (homeSettings.showQuotes) {
+                    item {
+                        RotatableFinancialQuoteCard(
+                            advice = financialAdvice
+                        )
+                    }
                 }
 
-                if (financialAdvice.warnings.isNotEmpty()) {
+                if (homeSettings.showFinancialWarnings && financialAdvice.warnings.isNotEmpty()) {
                     item {
                         WarningBannersSection(
                             warnings = financialAdvice.warnings
@@ -342,12 +395,14 @@ fun HomeScreen(
                     }
                 }
 
-                item {
-                    RecentTransactionsCard(
-                        transactions = displayedTransactions.take(5),
-                        onViewAllClick = onNavigateToTransactions,
-                        onDeleteTransaction = { viewModel.deleteTransaction(it) }
-                    )
+                if (homeSettings.showRecentTransactions) {
+                    item {
+                        RecentTransactionsCard(
+                            transactions = displayedTransactions.take(5),
+                            onViewAllClick = onNavigateToTransactions,
+                            onDeleteTransaction = { viewModel.deleteTransaction(it) }
+                        )
+                    }
                 }
 
                 item {

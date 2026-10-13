@@ -1,6 +1,10 @@
 package com.example.ui.components
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,6 +30,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.Image
@@ -62,6 +67,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.example.data.model.Account
 import com.example.ui.theme.GoldTarget
@@ -70,12 +77,25 @@ import com.example.ui.theme.NavyHero
 import com.example.ui.theme.NavyHeroDark
 import com.example.util.Formatters
 import com.example.util.GeminiReceiptHelper
-import com.example.util.ReceiptScanner
 import kotlinx.coroutines.launch
+import java.io.File
 
 import com.example.util.BudgetCategoryHelper
 
 private val SCAN_CATEGORIES = BudgetCategoryHelper.CATEGORY_NAMES
+
+private fun createReceiptImageUri(context: Context): Uri {
+    val dir = File(context.cacheDir, "receipts")
+    if (!dir.exists()) {
+        dir.mkdirs()
+    }
+    val file = File(dir, "receipt_${System.currentTimeMillis()}.jpg")
+    return FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        file
+    )
+}
 
 @Composable
 fun ScanReceiptDialog(
@@ -88,6 +108,7 @@ fun ScanReceiptDialog(
     val isDark = isSystemInDarkTheme()
 
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
     var isAnalyzing by remember { mutableStateOf(false) }
     var isAiPowered by remember { mutableStateOf(false) }
     var analysisNotes by remember { mutableStateOf("") }
@@ -99,37 +120,72 @@ fun ScanReceiptDialog(
     var selectedCategory by remember { mutableStateOf("Makan") }
     var selectedAccount by remember { mutableStateOf(accounts.firstOrNull()?.name ?: "") }
     var selectedDate by remember { mutableStateOf(Formatters.currentIsoDate()) }
-    var manualTextInput by remember { mutableStateOf("") }
-    var showManualTextMode by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    fun processReceiptUri(uri: Uri) {
+        selectedImageUri = uri
+        isAnalyzing = true
+        detectedSuccess = false
+        errorMessage = null
+
+        coroutineScope.launch {
+            try {
+                val result = GeminiReceiptHelper.analyzeReceipt(context, uri)
+                description = result.merchant
+                if (result.amount > 0L) {
+                    rawAmount = Formatters.formatNumber(result.amount)
+                }
+                selectedCategory = if (result.category in SCAN_CATEGORIES) result.category else "Makan"
+                selectedDate = result.date
+                isAiPowered = result.isAiPowered
+                analysisNotes = result.notes
+                detectedSuccess = true
+            } catch (e: Exception) {
+                errorMessage = "Gagal memproses nota: ${e.message}"
+            } finally {
+                isAnalyzing = false
+            }
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success: Boolean ->
+        if (success) {
+            tempCameraUri?.let { uri ->
+                processReceiptUri(uri)
+            }
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            val uri = createReceiptImageUri(context)
+            tempCameraUri = uri
+            cameraLauncher.launch(uri)
+        } else {
+            Toast.makeText(context, "Izin kamera diperlukan untuk memotret nota secara langsung", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun launchCamera() {
+        val permissionCheck = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
+        if (permissionCheck == PackageManager.PERMISSION_GRANTED) {
+            val uri = createReceiptImageUri(context)
+            tempCameraUri = uri
+            cameraLauncher.launch(uri)
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
-            selectedImageUri = uri
-            isAnalyzing = true
-            detectedSuccess = false
-            errorMessage = null
-
-            coroutineScope.launch {
-                try {
-                    val result = GeminiReceiptHelper.analyzeReceipt(context, uri)
-                    description = result.merchant
-                    if (result.amount > 0L) {
-                        rawAmount = Formatters.formatNumber(result.amount)
-                    }
-                    selectedCategory = if (result.category in SCAN_CATEGORIES) result.category else "Makan"
-                    selectedDate = result.date
-                    isAiPowered = result.isAiPowered
-                    analysisNotes = result.notes
-                    detectedSuccess = true
-                } catch (e: Exception) {
-                    errorMessage = "Gagal memproses nota: ${e.message}"
-                } finally {
-                    isAnalyzing = false
-                }
-            }
+            processReceiptUri(uri)
         }
     }
 
@@ -179,7 +235,7 @@ fun ScanReceiptDialog(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                    color = IncomeGreen.copy(alpha = 0.15f)
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -189,13 +245,13 @@ fun ScanReceiptDialog(
                                             imageVector = Icons.Default.AutoAwesome,
                                             contentDescription = null,
                                             modifier = Modifier.size(10.dp),
-                                            tint = MaterialTheme.colorScheme.primary
+                                            tint = IncomeGreen
                                         )
                                         Spacer(modifier = Modifier.width(3.dp))
                                         Text(
-                                            text = "AI Ready",
+                                            text = "Gratis & Tanpa Batas",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary,
+                                            color = IncomeGreen,
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold
                                         )
@@ -203,7 +259,7 @@ fun ScanReceiptDialog(
                                 }
                             }
                             Text(
-                                text = "Pindai foto struk belanja untuk isi data otomatis",
+                                text = "Pindai foto struk belanja untuk isi data otomatis (Unlimited scan)",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -235,42 +291,53 @@ fun ScanReceiptDialog(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Pilih Foto Struk / Nota",
+                                text = "Pindai Struk / Nota Belanja",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "AI akan membaca total, nama toko, dan tanggal otomatis",
+                                text = "Foto langsung dengan kamera atau pilih dari galeri",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(14.dp))
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                                 Button(
+                                    onClick = { launchCamera() },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isDark) GoldTarget else NavyHero,
+                                        contentColor = if (isDark) NavyHeroDark else Color.White
+                                    ),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("scan_camera_button")
+                                ) {
+                                    Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Buka Kamera", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+
+                                OutlinedButton(
                                     onClick = {
                                         photoPickerLauncher.launch(
                                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                         )
                                     },
                                     shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (isDark) GoldTarget else NavyHero,
-                                        contentColor = if (isDark) NavyHeroDark else Color.White
-                                    )
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("scan_gallery_button")
                                 ) {
-                                    Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Pilih Foto Nota")
-                                }
-
-                                OutlinedButton(
-                                    onClick = { showManualTextMode = !showManualTextMode },
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Text(if (showManualTextMode) "Tutup Teks" else "Paste Teks")
+                                    Text("Dari Galeri", fontWeight = FontWeight.Medium, fontSize = 13.sp)
                                 }
                             }
                         }
@@ -337,47 +404,32 @@ fun ScanReceiptDialog(
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(4.dp))
-                                TextButton(
-                                    onClick = {
-                                        photoPickerLauncher.launch(
-                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                        )
-                                    },
-                                    modifier = Modifier.height(26.dp)
-                                ) {
-                                    Text("Ganti Foto", fontSize = 11.sp)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    TextButton(
+                                        onClick = { launchCamera() },
+                                        modifier = Modifier.height(28.dp)
+                                    ) {
+                                        Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Foto Ulang", fontSize = 11.sp)
+                                    }
+                                    TextButton(
+                                        onClick = {
+                                            photoPickerLauncher.launch(
+                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                            )
+                                        },
+                                        modifier = Modifier.height(28.dp)
+                                    ) {
+                                        Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Dari Galeri", fontSize = 11.sp)
+                                    }
                                 }
                             }
                         }
                     }
-                }
-
-                if (showManualTextMode) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedTextField(
-                        value = manualTextInput,
-                        onValueChange = {
-                            manualTextInput = it
-                            val parsed = ReceiptScanner.parseReceiptText(it)
-                            if (parsed.amount > 0) {
-                                rawAmount = Formatters.formatNumber(parsed.amount)
-                            }
-                            if (parsed.merchantOrTitle.isNotBlank()) {
-                                description = parsed.merchantOrTitle
-                            }
-                            if (parsed.category in SCAN_CATEGORIES) {
-                                selectedCategory = parsed.category
-                            }
-                            selectedDate = parsed.date
-                            detectedSuccess = true
-                        },
-                        label = { Text("Teks / Salinan Struk") },
-                        placeholder = { Text("Paste struk belanja / invoice di sini...") },
-                        modifier = Modifier.fillMaxWidth(),
-                        maxLines = 3,
-                        shape = RoundedCornerShape(12.dp)
-                    )
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))

@@ -2,14 +2,24 @@ package com.example.util
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
-import java.text.SimpleDateFormat
-import java.util.Date
+import android.util.Log
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import java.io.InputStream
 import java.util.Locale
 import java.util.regex.Pattern
+import kotlin.coroutines.resume
 
 data class ParsedReceipt(
     val amount: Long,
@@ -21,21 +31,63 @@ data class ParsedReceipt(
 )
 
 object ReceiptScanner {
+    private const val TAG = "ReceiptScanner"
+
+    /**
+     * Performs On-Device ML Kit Text Recognition on the given image URI.
+     * Works 100% offline without API keys or network connection.
+     */
+    suspend fun scanReceipt(context: Context, uri: Uri): ParsedReceipt = withContext(Dispatchers.IO) {
+        val rawText = performOcr(context, uri)
+        parseReceiptText(rawText)
+    }
+
+    suspend fun performOcr(context: Context, uri: Uri): String = suspendCancellableCoroutine { continuation ->
+        try {
+            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            val image = InputImage.fromFilePath(context, uri)
+
+            recognizer.process(image)
+                .addOnSuccessListener { visionText ->
+                    val text = visionText.text
+                    Log.d(TAG, "ML Kit OCR recognized ${text.length} chars")
+                    continuation.resume(text)
+                }
+                .addOnFailureListener { e ->
+                    Log.w(TAG, "ML Kit OCR direct filePath failed, trying bitmap fallback: ${e.message}")
+                    val fallbackBitmap = loadSafeBitmap(context, uri, 1200)
+                    if (fallbackBitmap != null) {
+                        try {
+                            val bitmapImage = InputImage.fromBitmap(fallbackBitmap, 0)
+                            recognizer.process(bitmapImage)
+                                .addOnSuccessListener { visionText ->
+                                    continuation.resume(visionText.text)
+                                }
+                                .addOnFailureListener {
+                                    continuation.resume("")
+                                }
+                        } catch (_: Exception) {
+                            continuation.resume("")
+                        }
+                    } else {
+                        continuation.resume("")
+                    }
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initiating ML Kit OCR: ${e.message}")
+            continuation.resume("")
+        }
+    }
 
     /**
      * Parses OCR text from a physical or digital receipt.
-     * Extracts:
-     * - Total nominal (Total / Grand Total / Jumlah / Bayar / Rp / Subtotal)
-     * - Merchant or store name
-     * - Date if present
-     * - Suggested category (Makan, Belanja, Kesehatan, dll.)
      */
     fun parseReceiptText(rawText: String): ParsedReceipt {
         val lines = rawText.lines().map { it.trim() }.filter { it.isNotBlank() }
         if (lines.isEmpty()) {
             return ParsedReceipt(
                 amount = 0L,
-                merchantOrTitle = "Pengeluaran Nota",
+                merchantOrTitle = "Nota Belanja",
                 date = Formatters.currentIsoDate(),
                 category = "Makan",
                 rawText = "",
@@ -43,44 +95,80 @@ object ReceiptScanner {
             )
         }
 
+        val fullLower = rawText.lowercase(Locale.ROOT)
+
         // 1. Detect Merchant / Store Name
-        // Usually the first 1-3 lines of a receipt contain the store or restaurant name
-        var merchantName = "Nota Belanja"
-        for (i in 0 until minOf(4, lines.size)) {
-            val candidate = lines[i]
-            val lower = candidate.lowercase(Locale.ROOT)
-            if (!lower.contains("struk") &&
-                !lower.contains("nota") &&
-                !lower.contains("bill") &&
-                !lower.contains("receipt") &&
-                !lower.contains("welcome") &&
-                !lower.contains("selamat datang") &&
-                !lower.contains("tanggal") &&
-                !lower.contains("date") &&
-                candidate.length in 3..40
-            ) {
-                merchantName = candidate
-                break
+        var merchantName = detectKnownBrand(fullLower)
+
+        if (merchantName == null) {
+            // Check top lines for reasonable store name
+            for (i in 0 until minOf(6, lines.size)) {
+                val candidate = lines[i]
+                val lower = candidate.lowercase(Locale.ROOT)
+                if (!lower.contains("struk") &&
+                    !lower.contains("nota") &&
+                    !lower.contains("bill") &&
+                    !lower.contains("receipt") &&
+                    !lower.contains("welcome") &&
+                    !lower.contains("selamat datang") &&
+                    !lower.contains("tanggal") &&
+                    !lower.contains("tgl") &&
+                    !lower.contains("date") &&
+                    !lower.contains("kasir") &&
+                    !lower.contains("cashier") &&
+                    !lower.contains("pos") &&
+                    !lower.contains("npwp") &&
+                    !lower.contains("telp") &&
+                    !lower.contains("phone") &&
+                    !lower.contains("jl.") &&
+                    !lower.contains("jalan") &&
+                    !lower.contains("no.") &&
+                    !lower.contains("www.") &&
+                    !lower.contains("http") &&
+                    candidate.length in 3..40
+                ) {
+                    merchantName = candidate.trim()
+                    break
+                }
             }
+        }
+
+        if (merchantName.isNullOrBlank()) {
+            merchantName = "Nota Belanja"
         }
 
         // 2. Extract Total Amount
         var detectedAmount = 0L
-        // Primary total keywords (Actual bill amount)
+
+        // Primary total keywords
         val primaryTotalKeywords = listOf(
-            "grand total", "total akhir", "total bayar", "jumlah bayar", "netto", "total"
+            "total akhir", "grand total", "total bayar", "jumlah bayar", "tot. bayar",
+            "tot bayar", "total belanja", "total tagihan", "harga total", "netto",
+            "total :", "total:", "total"
         )
         val secondaryKeywords = listOf(
-            "sub total", "subtotal", "tagihan", "jumlah"
+            "sub total", "subtotal", "tagihan", "jumlah", "bayar"
         )
 
-        // First pass: Look for explicit bill total keywords, ignoring lines that are tender payment (tunai/cash/kembali)
-        for (line in lines) {
+        // Pass 1: Look for explicit primary total keywords
+        for (i in lines.indices) {
+            val line = lines[i]
             val lower = line.lowercase(Locale.ROOT)
-            if (lower.contains("kembali") || lower.contains("change")) continue
+            if (lower.contains("kembali") || lower.contains("change") || lower.contains("kembalian")) continue
+            if (lower.contains("diskon") || lower.contains("discount") || lower.contains("hemat")) continue
+
             for (kw in primaryTotalKeywords) {
                 if (lower.contains(kw) && !lower.contains("item") && !lower.contains("qty")) {
-                    val extracted = extractLargestNumberFromLine(line)
+                    var extracted = extractLargestNumberFromLine(line)
+                    // If no number on this line, check the next line! (Common OCR split: line 1 = "TOTAL", line 2 = "45.000")
+                    if (extracted == 0L && i + 1 < lines.size) {
+                        val nextLine = lines[i + 1]
+                        val nextLower = nextLine.lowercase(Locale.ROOT)
+                        if (!nextLower.contains("kembali") && !nextLower.contains("change") && !nextLower.contains("diskon")) {
+                            extracted = extractLargestNumberFromLine(nextLine)
+                        }
+                    }
+
                     if (extracted > 500L && extracted > detectedAmount) {
                         detectedAmount = extracted
                     }
@@ -88,14 +176,24 @@ object ReceiptScanner {
             }
         }
 
-        // Secondary pass if no primary total found
+        // Pass 2: Secondary keywords if no primary total found
         if (detectedAmount == 0L) {
-            for (line in lines) {
+            for (i in lines.indices) {
+                val line = lines[i]
                 val lower = line.lowercase(Locale.ROOT)
-                if (lower.contains("kembali") || lower.contains("change")) continue
+                if (lower.contains("kembali") || lower.contains("change") || lower.contains("kembalian")) continue
+                if (lower.contains("diskon") || lower.contains("discount") || lower.contains("hemat")) continue
+
                 for (kw in secondaryKeywords) {
                     if (lower.contains(kw)) {
-                        val extracted = extractLargestNumberFromLine(line)
+                        var extracted = extractLargestNumberFromLine(line)
+                        if (extracted == 0L && i + 1 < lines.size) {
+                            val nextLine = lines[i + 1]
+                            val nextLower = nextLine.lowercase(Locale.ROOT)
+                            if (!nextLower.contains("kembali") && !nextLower.contains("change")) {
+                                extracted = extractLargestNumberFromLine(nextLine)
+                            }
+                        }
                         if (extracted > 500L && extracted > detectedAmount) {
                             detectedAmount = extracted
                         }
@@ -104,17 +202,35 @@ object ReceiptScanner {
             }
         }
 
-        // Second pass: if keyword-based search didn't find, look for all numbers in text and pick the most reasonable maximum
+        // Pass 3: Lines containing "Rp" or currency
+        if (detectedAmount == 0L) {
+            for (line in lines) {
+                val lower = line.lowercase(Locale.ROOT)
+                if (lower.contains("kembali") || lower.contains("change") || lower.contains("kembalian")) continue
+                if (lower.contains("rp") || lower.contains("idr")) {
+                    val extracted = extractLargestNumberFromLine(line)
+                    if (extracted in 1000L..50000000L && extracted > detectedAmount) {
+                        detectedAmount = extracted
+                    }
+                }
+            }
+        }
+
+        // Pass 4: Look for largest reasonable number on lines without noise
         if (detectedAmount == 0L) {
             var maxCandidate = 0L
             for (line in lines) {
+                val lower = line.lowercase(Locale.ROOT)
+                if (lower.contains("kembali") || lower.contains("change") || lower.contains("telp") ||
+                    lower.contains("hp") || lower.contains("wa") || lower.contains("tgl") ||
+                    lower.contains("npwp") || lower.contains("kasir") || lower.contains("meja") ||
+                    lower.contains("order") || lower.contains("trx") || lower.contains("no.")
+                ) {
+                    continue
+                }
                 val num = extractLargestNumberFromLine(line)
-                // Filter out likely phone numbers or dates (e.g. 20241010, 08123456789)
                 if (num in 1000L..50000000L && num > maxCandidate) {
-                    val lower = line.lowercase(Locale.ROOT)
-                    if (!lower.contains("telp") && !lower.contains("hp") && !lower.contains("wa") && !lower.contains("tgl")) {
-                        maxCandidate = num
-                    }
+                    maxCandidate = num
                 }
             }
             detectedAmount = maxCandidate
@@ -123,36 +239,10 @@ object ReceiptScanner {
         // 3. Extract Date
         val detectedDate = extractDateFromLines(lines) ?: Formatters.currentIsoDate()
 
-        // 4. Determine Category from text contents
-        val fullLower = rawText.lowercase(Locale.ROOT)
-        val category = when {
-            fullLower.contains("resto") || fullLower.contains("cafe") || fullLower.contains("kopi") ||
-            fullLower.contains("coffee") || fullLower.contains("nasi") || fullLower.contains("ayam") ||
-            fullLower.contains("mie") || fullLower.contains("bakso") || fullLower.contains("food") ||
-            fullLower.contains("minum") || fullLower.contains("makan") || fullLower.contains("warung") ||
-            fullLower.contains("dapur") || fullLower.contains("kitchen") -> "Makan"
+        // 4. Determine Category
+        val category = determineCategory(merchantName, fullLower)
 
-            fullLower.contains("indomaret") || fullLower.contains("alfamart") || fullLower.contains("supermarket") ||
-            fullLower.contains("mart") || fullLower.contains("hypermart") || fullLower.contains("market") ||
-            fullLower.contains("toko") || fullLower.contains("belanja") -> "Belanja"
-
-            fullLower.contains("apotek") || fullLower.contains("klinik") || fullLower.contains("kimia farma") ||
-            fullLower.contains("obat") || fullLower.contains("dokter") || fullLower.contains("hospital") -> "Kesehatan"
-
-            fullLower.contains("spbu") || fullLower.contains("pertamina") || fullLower.contains("bensin") ||
-            fullLower.contains("shell") || fullLower.contains("gojek") || fullLower.contains("grab") ||
-            fullLower.contains("parkir") || fullLower.contains("tol") -> "Transportasi"
-
-            fullLower.contains("kos") || fullLower.contains("listrik") || fullLower.contains("pln") ||
-            fullLower.contains("pdam") || fullLower.contains("wifi") || fullLower.contains("indihome") -> "Kebutuhan Kos"
-
-            fullLower.contains("bioskop") || fullLower.contains("cinema") || fullLower.contains("game") ||
-            fullLower.contains("tiket") -> "Hiburan"
-
-            else -> "Makan"
-        }
-
-        val confidence = if (detectedAmount > 0 && merchantName.isNotBlank()) "Tinggi" else "Sedang"
+        val confidence = if (detectedAmount > 0 && merchantName != "Nota Belanja") "Tinggi" else if (detectedAmount > 0) "Sedang" else "Rendah"
 
         return ParsedReceipt(
             amount = detectedAmount,
@@ -164,10 +254,140 @@ object ReceiptScanner {
         )
     }
 
+    private fun detectKnownBrand(fullLower: String): String? {
+        val brands = listOf(
+            "indomaret" to "Indomaret",
+            "alfamart" to "Alfamart",
+            "alfamidi" to "Alfamidi",
+            "superindo" to "Super Indo",
+            "super indo" to "Super Indo",
+            "transmart" to "Transmart",
+            "hypermart" to "Hypermart",
+            "lotte mart" to "Lotte Mart",
+            "hero" to "Hero Supermarket",
+            "familymart" to "FamilyMart",
+            "circle k" to "Circle K",
+            "lawson" to "Lawson",
+            "kfc" to "KFC",
+            "mcdonald" to "McDonald's",
+            "mcd" to "McDonald's",
+            "burger king" to "Burger King",
+            "hokben" to "HokBen",
+            "hoka hoka bento" to "HokBen",
+            "pizza hut" to "Pizza Hut",
+            "domino" to "Domino's Pizza",
+            "solaria" to "Solaria",
+            "mie gacoan" to "Mie Gacoan",
+            "gacoan" to "Mie Gacoan",
+            "kopi kenangan" to "Kopi Kenangan",
+            "janji jiwa" to "Kopi Janji Jiwa",
+            "fore coffee" to "Fore Coffee",
+            "starbucks" to "Starbucks",
+            "point coffee" to "Point Coffee",
+            "mixue" to "Mixue",
+            "chatime" to "Chatime",
+            "tomoro coffee" to "Tomoro Coffee",
+            "tomoro" to "Tomoro Coffee",
+            "kopi soe" to "Kopi Soe",
+            "j.co" to "J.CO Donuts",
+            "jco" to "J.CO Donuts",
+            "breadtalk" to "BreadTalk",
+            "mako" to "Mako Bakery",
+            "roti'o" to "Roti'O",
+            "rotio" to "Roti'O",
+            "holland bakery" to "Holland Bakery",
+            "richeese" to "Richeese Factory",
+            "yoshinoya" to "Yoshinoya",
+            "marugame" to "Marugame Udon",
+            "bakmi gm" to "Bakmi GM",
+            "guardian" to "Guardian",
+            "watsons" to "Watsons",
+            "century" to "Century Healthcare",
+            "kimia farma" to "Kimia Farma",
+            "k-24" to "Apotek K-24",
+            "apotek k24" to "Apotek K-24",
+            "pertamina" to "SPBU Pertamina",
+            "spbu" to "SPBU",
+            "shell" to "SPBU Shell",
+            "bp-akr" to "SPBU BP",
+            "gojek" to "Gojek",
+            "gofood" to "GoFood",
+            "grab" to "Grab",
+            "grabfood" to "GrabFood",
+            "shopeefood" to "ShopeeFood",
+            "shopee" to "Shopee",
+            "tokopedia" to "Tokopedia",
+            "miniso" to "Miniso",
+            "mr diy" to "MR. D.I.Y.",
+            "mr. diy" to "MR. D.I.Y.",
+            "ace hardware" to "ACE Hardware",
+            "informa" to "Informa",
+            "ikea" to "IKEA",
+            "cinema xxi" to "Cinema XXI",
+            "cgv" to "CGV Cinemas",
+            "cinepolis" to "Cinépolis"
+        )
+
+        for ((keyword, brandName) in brands) {
+            if (fullLower.contains(keyword)) {
+                return brandName
+            }
+        }
+        return null
+    }
+
+    private fun determineCategory(merchant: String, fullLower: String): String {
+        val mLower = merchant.lowercase(Locale.ROOT)
+        return when {
+            // Food & Drink
+            mLower.contains("resto") || mLower.contains("cafe") || mLower.contains("kopi") ||
+            mLower.contains("coffee") || mLower.contains("nasi") || mLower.contains("ayam") ||
+            mLower.contains("mie") || mLower.contains("bakso") || mLower.contains("food") ||
+            mLower.contains("makan") || mLower.contains("warung") || mLower.contains("dapur") ||
+            mLower.contains("kitchen") || mLower.contains("kfc") || mLower.contains("mcd") ||
+            mLower.contains("hokben") || mLower.contains("solaria") || mLower.contains("gacoan") ||
+            mLower.contains("starbucks") || mLower.contains("bakery") || mLower.contains("roti") ||
+            fullLower.contains("makan") || fullLower.contains("minum") || fullLower.contains("resto") ||
+            fullLower.contains("cafe") || fullLower.contains("kopi") || fullLower.contains("nasi") -> "Makan"
+
+            // Supermarket & Groceries
+            mLower.contains("indomaret") || mLower.contains("alfamart") || mLower.contains("alfamidi") ||
+            mLower.contains("super indo") || mLower.contains("superindo") || mLower.contains("transmart") ||
+            mLower.contains("hypermart") || mLower.contains("mart") || mLower.contains("market") ||
+            mLower.contains("supermarket") || mLower.contains("swalayan") || mLower.contains("toko") ||
+            fullLower.contains("indomaret") || fullLower.contains("alfamart") || fullLower.contains("belanja") -> "Belanja Bulanan"
+
+            // Pharmacy & Health
+            mLower.contains("apotek") || mLower.contains("apotik") || mLower.contains("klinik") ||
+            mLower.contains("kimia farma") || mLower.contains("k-24") || mLower.contains("k24") ||
+            mLower.contains("guardian") || mLower.contains("watsons") || mLower.contains("century") ||
+            mLower.contains("rs") || mLower.contains("rumah sakit") || mLower.contains("obat") ||
+            fullLower.contains("apotek") || fullLower.contains("obat") || fullLower.contains("dokter") -> "Kesehatan"
+
+            // Transportation
+            mLower.contains("spbu") || mLower.contains("pertamina") || mLower.contains("shell") ||
+            mLower.contains("bensin") || mLower.contains("parkir") || mLower.contains("tol") ||
+            mLower.contains("gojek") || mLower.contains("grab") || mLower.contains("bluebird") ||
+            fullLower.contains("bensin") || fullLower.contains("spbu") || fullLower.contains("parkir") -> "Transportasi"
+
+            // Housing / Kos
+            mLower.contains("pln") || mLower.contains("listrik") || mLower.contains("pdam") ||
+            mLower.contains("kos") || mLower.contains("kost") || mLower.contains("laundry") ||
+            mLower.contains("indihome") || mLower.contains("wifi") ||
+            fullLower.contains("listrik") || fullLower.contains("token") || fullLower.contains("pdam") -> "Kebutuhan Kos"
+
+            // Entertainment
+            mLower.contains("cinema") || mLower.contains("xxi") || mLower.contains("cgv") ||
+            mLower.contains("cinepolis") || mLower.contains("game") || mLower.contains("tiket") ||
+            fullLower.contains("bioskop") || fullLower.contains("cinema") -> "Hiburan & Rekreasi"
+
+            else -> "Makan"
+        }
+    }
+
     private fun extractLargestNumberFromLine(line: String): Long {
-        // Strip out currencies and punctuation, e.g. "Rp. 45.000,00" -> "45000"
-        // Indonesian formats: 45.000 or 45,000 or 45000.00
-        val regex = Regex("""(?:Rp\.?|IDR)?\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?|[0-9]+)""")
+        // Strip out currencies, colons, and punctuation, e.g. "Total : Rp. 45.000,00" -> "45000"
+        val regex = Regex("""(?:Rp\.?|IDR)?\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?|[0-9]{3,})""")
         val matches = regex.findAll(line)
         var maxVal = 0L
 
@@ -184,12 +404,13 @@ object ReceiptScanner {
     private fun normalizeCurrencyString(raw: String): Long {
         try {
             var s = raw.trim()
-            // If ends with ,00 or .00 (cents), remove them
+            if (s.endsWith(",-") || s.endsWith(".-")) {
+                s = s.substring(0, s.length - 2)
+            }
             if (s.endsWith(",00") || s.endsWith(".00")) {
                 s = s.substring(0, s.length - 3)
             }
-            // Remove remaining thousand separators (dots or commas)
-            val digitsOnly = s.replace(".", "").replace(",", "").replace(" ", "")
+            val digitsOnly = s.replace(".", "").replace(",", "").replace(" ", "").replace(":", "")
             return digitsOnly.toLongOrNull() ?: 0L
         } catch (_: Exception) {
             return 0L
@@ -197,10 +418,9 @@ object ReceiptScanner {
     }
 
     private fun extractDateFromLines(lines: List<String>): String? {
-        // Patterns: DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD
         val patterns = listOf(
-            Pattern.compile("""(\d{2})[-/](\d{2})[-/](\d{4})"""),
-            Pattern.compile("""(\d{4})[-/](\d{2})[-/](\d{2})""")
+            Pattern.compile("""(\d{2})[-/.](\d{2})[-/.](\d{4})"""),
+            Pattern.compile("""(\d{4})[-/.](\d{2})[-/.](\d{2})""")
         )
 
         for (line in lines) {
@@ -222,19 +442,65 @@ object ReceiptScanner {
         return null
     }
 
-    fun loadBitmapFromUri(context: Context, uri: Uri): Bitmap? {
+    /**
+     * Loads a downsampled software bitmap, preventing any hardware bitmap crashes
+     * and respecting EXIF orientation tags.
+     */
+    fun loadSafeBitmap(context: Context, uri: Uri, maxDimension: Int = 1024): Bitmap? {
         return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                val source = ImageDecoder.createSource(context.contentResolver, uri)
-                ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-                    decoder.isMutableRequired = true
-                }
+            val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
+            val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeStream(inputStream, null, boundsOptions)
+            inputStream?.close()
+
+            val origWidth = boundsOptions.outWidth
+            val origHeight = boundsOptions.outHeight
+            if (origWidth <= 0 || origHeight <= 0) return null
+
+            var sampleSize = 1
+            while (origWidth / sampleSize > maxDimension || origHeight / sampleSize > maxDimension) {
+                sampleSize *= 2
+            }
+
+            val decodeOptions = BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+
+            val decodedStream = context.contentResolver.openInputStream(uri)
+            val rawBitmap = BitmapFactory.decodeStream(decodedStream, null, decodeOptions)
+            decodedStream?.close()
+
+            if (rawBitmap == null) return null
+
+            // Handle EXIF orientation rotation
+            val rotationDegrees = getExifRotationDegrees(context, uri)
+            if (rotationDegrees != 0) {
+                val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
+                Bitmap.createBitmap(rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true)
             } else {
-                @Suppress("DEPRECATION")
-                MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                rawBitmap
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading safe bitmap: ${e.message}")
+            null
+        }
+    }
+
+    private fun getExifRotationDegrees(context: Context, uri: Uri): Int {
+        return try {
+            val inputStream = context.contentResolver.openInputStream(uri) ?: return 0
+            val exif = ExifInterface(inputStream)
+            val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+            inputStream.close()
+            when (orientation) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> 90
+                ExifInterface.ORIENTATION_ROTATE_180 -> 180
+                ExifInterface.ORIENTATION_ROTATE_270 -> 270
+                else -> 0
             }
         } catch (_: Exception) {
-            null
+            0
         }
     }
 }

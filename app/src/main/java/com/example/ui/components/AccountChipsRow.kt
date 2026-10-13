@@ -109,7 +109,7 @@ fun AccountChipsRow(
                                     maxLines = 1
                                 )
                                 Text(
-                                    text = if (acc.isLiquid) "Aset lancar" else "Tidak lancar",
+                                    text = if (acc.isLiquid) "Liquid Aset" else "Non-Liquid Aset",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                     fontSize = 10.sp

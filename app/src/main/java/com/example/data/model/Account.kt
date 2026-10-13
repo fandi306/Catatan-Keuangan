@@ -6,7 +6,7 @@ data class Account(
     val id: String = "",
     val userId: String = "",
     val name: String = "",
-    val type: String = "liquid", // "liquid" (Aset lancar) or "non_liquid" (Aset tidak lancar)
+    val type: String = "liquid", // "liquid" (Liquid Aset) or "non_liquid" (Non-Liquid Aset)
     val createdAt: Timestamp? = null,
     val updatedAt: Timestamp? = null
 ) {
