@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -30,6 +31,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DocumentScanner
@@ -40,6 +42,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -49,6 +54,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -79,6 +85,9 @@ import com.example.util.Formatters
 import com.example.util.GeminiReceiptHelper
 import kotlinx.coroutines.launch
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 import com.example.util.BudgetCategoryHelper
 
@@ -97,6 +106,7 @@ private fun createReceiptImageUri(context: Context): Uri {
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScanReceiptDialog(
     accounts: List<Account>,
@@ -120,6 +130,7 @@ fun ScanReceiptDialog(
     var selectedCategory by remember { mutableStateOf("Makan") }
     var selectedAccount by remember { mutableStateOf(accounts.firstOrNull()?.name ?: "") }
     var selectedDate by remember { mutableStateOf(Formatters.currentIsoDate()) }
+    var showDatePicker by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     fun processReceiptUri(uri: Uri) {
@@ -306,22 +317,25 @@ fun ScanReceiptDialog(
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 Button(
                                     onClick = { launchCamera() },
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = RoundedCornerShape(14.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = if (isDark) GoldTarget else NavyHero,
                                         contentColor = if (isDark) NavyHeroDark else Color.White
                                     ),
                                     modifier = Modifier
                                         .weight(1f)
+                                        .height(48.dp)
                                         .testTag("scan_camera_button")
                                 ) {
-                                    Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Buka Kamera", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Icon(
+                                        imageVector = Icons.Default.CameraAlt,
+                                        contentDescription = "Buka Kamera",
+                                        modifier = Modifier.size(24.dp)
+                                    )
                                 }
 
                                 OutlinedButton(
@@ -330,14 +344,24 @@ fun ScanReceiptDialog(
                                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                         )
                                     },
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = if (isDark) GoldTarget else NavyHero
+                                    ),
+                                    border = BorderStroke(
+                                        1.5.dp,
+                                        if (isDark) GoldTarget.copy(alpha = 0.5f) else NavyHero.copy(alpha = 0.35f)
+                                    ),
                                     modifier = Modifier
                                         .weight(1f)
+                                        .height(48.dp)
                                         .testTag("scan_gallery_button")
                                 ) {
-                                    Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Dari Galeri", fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                                    Icon(
+                                        imageVector = Icons.Default.Image,
+                                        contentDescription = "Dari Galeri",
+                                        modifier = Modifier.size(24.dp)
+                                    )
                                 }
                             }
                         }
@@ -405,26 +429,48 @@ fun ScanReceiptDialog(
                                 }
 
                                 Spacer(modifier = Modifier.height(6.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    TextButton(
-                                        onClick = { launchCamera() },
-                                        modifier = Modifier.height(28.dp)
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = (if (isDark) GoldTarget else NavyHero).copy(alpha = 0.15f),
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .clickable { launchCamera() }
                                     ) {
-                                        Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Foto Ulang", fontSize = 11.sp)
-                                    }
-                                    TextButton(
-                                        onClick = {
-                                            photoPickerLauncher.launch(
-                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.CameraAlt,
+                                                contentDescription = "Foto Ulang Kamera",
+                                                tint = if (isDark) GoldTarget else NavyHero,
+                                                modifier = Modifier.size(18.dp)
                                             )
-                                        },
-                                        modifier = Modifier.height(28.dp)
+                                        }
+                                    }
+
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = (if (isDark) GoldTarget else NavyHero).copy(alpha = 0.15f),
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .clickable {
+                                                photoPickerLauncher.launch(
+                                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                                )
+                                            }
                                     ) {
-                                        Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Dari Galeri", fontSize = 11.sp)
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.Image,
+                                                contentDescription = "Pilih Galeri",
+                                                tint = if (isDark) GoldTarget else NavyHero,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -509,6 +555,57 @@ fun ScanReceiptDialog(
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                 modifier = Modifier.padding(vertical = 6.dp)
                             )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Tanggal Transaksi (Sesuai Nota)
+                Text(
+                    text = "Tanggal Transaksi (Sesuai Nota)",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showDatePicker = true }
+                        .testTag("scan_input_date")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.CalendarToday,
+                                contentDescription = null,
+                                tint = if (isDark) GoldTarget else NavyHero,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = Formatters.formatDateIndo(selectedDate),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = { showDatePicker = true },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(30.dp)
+                        ) {
+                            Text("Pilih Tanggal", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -655,6 +752,38 @@ fun ScanReceiptDialog(
                     }
                 }
             }
+        }
+    }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = try {
+                SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(selectedDate)?.time ?: System.currentTimeMillis()
+            } catch (_: Exception) {
+                System.currentTimeMillis()
+            }
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val millis = datePickerState.selectedDateMillis
+                    if (millis != null) {
+                        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                        selectedDate = sdf.format(Date(millis))
+                    }
+                    showDatePicker = false
+                }) {
+                    Text("Pilih", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Batal")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 }

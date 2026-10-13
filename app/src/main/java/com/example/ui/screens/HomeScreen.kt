@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.HelpOutline
@@ -92,6 +93,7 @@ fun HomeScreen(
     onNavigateToProfile: () -> Unit,
     onNavigateToTransactions: () -> Unit,
     onNavigateToAnalytics: () -> Unit,
+    onNavigateToCurhatAi: () -> Unit = {},
     onAddNewTransaction: () -> Unit
 ) {
     val totalAsset by viewModel.totalAsset.collectAsState()
@@ -377,6 +379,8 @@ fun HomeScreen(
                         onNextMonth = { viewModel.changeMonth(1) }
                     )
                 }
+
+
 
                 // Kutipan Finansial Dinamis (Bisa disembunyikan via Kustomisasi Profil)
                 if (homeSettings.showQuotes) {
@@ -837,6 +841,81 @@ private fun RecentTransactionsCard(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun CurhatAiBannerCard(
+    onClick: () -> Unit
+) {
+    val isDark = isSystemInDarkTheme()
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDark) NavySurfaceDark else MaterialTheme.colorScheme.surface
+        ),
+        border = androidx.compose.foundation.BorderStroke(1.dp, GoldTarget.copy(alpha = 0.45f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .testTag("banner_curhat_ai")
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(GoldTarget.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = if (isDark) GoldTarget else NavyHero,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Curhat Finansial ke AI",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = IncomeGreen.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = "Tersinkron",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = IncomeGreen,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Ada pengeluaran tak terduga atau overbudget? Ceritakan, AI siap mencatatkan otomatis!",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = GoldTarget,
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }

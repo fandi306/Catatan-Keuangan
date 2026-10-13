@@ -353,31 +353,25 @@ private fun OjkBudgetFormulaItem(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Baris atas: Kotak badge rumus di kiri & Kotak status capaian saat ini di kanan
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (isDark) NavyHero.copy(alpha = 0.35f) else GoldTarget.copy(alpha = 0.25f)
-                    ) {
-                        Text(
-                            text = tip.formulaBadge,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isDark) GoldTarget else NavyHero,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (isDark) NavyHero.copy(alpha = 0.45f) else GoldTarget.copy(alpha = 0.25f)
+                ) {
                     Text(
-                        text = tip.title,
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = tip.formulaBadge,
+                        style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = if (isDark) GoldTarget else NavyHero,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
 
@@ -390,18 +384,31 @@ private fun OjkBudgetFormulaItem(
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = statusColor,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
+            // Judul Kategori Panduan OJK (Legeh, tidak berebut ruang horizontal)
+            Text(
+                text = tip.title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Catatan dan saran alokasi
             Text(
                 text = tip.advice,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                lineHeight = 17.sp
+                lineHeight = 18.sp
             )
         }
     }

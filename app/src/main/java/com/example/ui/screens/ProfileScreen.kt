@@ -35,9 +35,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
@@ -116,6 +118,7 @@ import com.google.firebase.auth.auth
 fun ProfileScreen(
     viewModel: FinanceViewModel,
     onNavigateBack: () -> Unit,
+    onNavigateToCurhatAi: () -> Unit = {},
     onSignedOut: () -> Unit
 ) {
     BackHandler {
@@ -397,30 +400,16 @@ fun ProfileScreen(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("📝", fontSize = 14.sp)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Bio & Catatan Keuangan",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                            TextButton(
-                                onClick = { showEditProfileDialog = true },
-                                modifier = Modifier.height(28.dp)
-                            ) {
-                                Text(
-                                    text = if (userProfile?.bio.isNullOrBlank()) "+ Tambah Bio" else "Ubah Bio",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            Text("📝", fontSize = 14.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Bio & Catatan Keuangan",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
@@ -537,7 +526,7 @@ fun ProfileScreen(
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "Tentang Pembuat Aplikasi",
+                                text = "Tentang Aplikasi",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -551,7 +540,7 @@ fun ProfileScreen(
                             )
                         }
                         Text(
-                            text = "Versi 1.1.0.0 Beta tester version · Info pengembang",
+                            text = "Informasi & Kontak · V1.1.0 Beta tester",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -568,6 +557,148 @@ fun ProfileScreen(
                     modifier = Modifier.height(36.dp)
                 ) {
                     Text("Buka", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+
+    // Asisten Finansia AI & Notifikasi Control Center
+    val aiAndNotificationSection: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                text = "Asisten AI & Notifikasi Control Center",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = CardDefaults.outlinedCardBorder(),
+                modifier = Modifier.fillMaxWidth().testTag("profile_ai_card")
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    // Chatbot Finansia AI
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = GoldTarget.copy(alpha = 0.15f),
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = if (isDark) GoldTarget else NavyHero,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Curhat & Asisten Finansia AI",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = GoldTarget.copy(alpha = 0.2f)
+                                ) {
+                                    Text(
+                                        text = "BETA",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) GoldTarget else NavyHero,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Tersambung ke data finansial, deteksi transaksi otomatis & saran berhemat",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = onNavigateToCurhatAi,
+                            shape = RoundedCornerShape(99.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isDark) GoldTarget else NavyHero,
+                                contentColor = if (isDark) NavyHeroDark else Color.White
+                            ),
+                            modifier = Modifier
+                                .height(36.dp)
+                                .testTag("btn_open_curhat_ai_profile")
+                        ) {
+                            Text("Buka", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Notifikasi Control Center
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = IncomeGreen.copy(alpha = 0.15f),
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.NotificationsActive,
+                                    contentDescription = null,
+                                    tint = IncomeGreen,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Notifikasi Control Center",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Peringatan overbudget, transaksi besar, & konfirmasi sync curhat AI",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                val sent = com.example.util.FinancialNotificationHelper.sendTestNotification(context)
+                                if (sent) {
+                                    android.widget.Toast.makeText(context, "Notifikasi terkirim ke panel status bar!", android.widget.Toast.LENGTH_SHORT).show()
+                                } else {
+                                    android.widget.Toast.makeText(context, "Aktifkan izin notifikasi di pengaturan HP.", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            shape = RoundedCornerShape(99.dp),
+                            modifier = Modifier.height(36.dp)
+                        ) {
+                            Text("Uji Coba", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
         }
@@ -1237,6 +1368,7 @@ fun ProfileScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         profileCardSection()
+                        aiAndNotificationSection()
                         creatorCardSection()
                         syncExplanationSection()
                     }
@@ -1265,6 +1397,8 @@ fun ProfileScreen(
                 topBarSection()
                 Spacer(modifier = Modifier.height(16.dp))
                 profileCardSection()
+                Spacer(modifier = Modifier.height(16.dp))
+                aiAndNotificationSection()
                 Spacer(modifier = Modifier.height(16.dp))
                 creatorCardSection()
                 Spacer(modifier = Modifier.height(16.dp))
@@ -1426,7 +1560,7 @@ fun ProfileScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Tentang Pembuat Aplikasi",
+                        text = "Tentang Aplikasi",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleMedium
                     )
@@ -1443,10 +1577,13 @@ fun ProfileScreen(
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
-                                    text = "Nama Pengembang: ",
+                                    text = "Pengembang: ",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1458,30 +1595,9 @@ fun ProfileScreen(
                                     color = if (isDark) GoldTarget else NavyHero
                                 )
                             }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "Versi Aplikasi: ",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = (if (isDark) GoldTarget else NavyHero).copy(alpha = 0.15f)
-                                ) {
-                                    Text(
-                                        text = "1.1.0.0 Beta tester version",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isDark) GoldTarget else NavyHero,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Aplikasi Catatan Keuangan dibuat khusus oleh Fandi Ahmad untuk memberikan solusi pencatatan finansial pribadi yang bersih, cepat, aman, dan tersinkronisasi antar perangkat secara real-time.",
+                                text = "Dibuat khusus untuk memberikan solusi pencatatan finansial pribadi yang bersih, cepat, aman, dan tersinkronisasi antar perangkat secara real-time.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 lineHeight = 18.sp
@@ -1548,13 +1664,25 @@ fun ProfileScreen(
                         }
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    Text(
-                        text = "Versi 1.1.0.0 Beta tester version · Kotlin Compose · Firebase Firestore",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(99.dp),
+                            color = (if (isDark) GoldTarget else NavyHero).copy(alpha = 0.12f)
+                        ) {
+                            Text(
+                                text = "V1.1.0 Beta tester",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDark) GoldTarget else NavyHero,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {

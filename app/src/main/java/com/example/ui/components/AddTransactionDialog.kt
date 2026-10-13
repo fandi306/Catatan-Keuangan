@@ -57,10 +57,13 @@ import androidx.compose.ui.window.Dialog
 import com.example.data.model.Account
 import com.example.ui.theme.ExpenseRed
 import com.example.ui.theme.GoldTarget
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import com.example.ui.theme.IncomeGreen
 import com.example.ui.theme.NavyHero
 import com.example.ui.theme.NavyHeroDark
 import com.example.util.Formatters
+import com.example.util.FinancialNotificationHelper
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -78,6 +81,7 @@ fun AddTransactionDialog(
     onCreateAccount: () -> Unit = {},
     onSave: (type: String, desc: String, amount: Long, account: String, category: String, date: String) -> Unit
 ) {
+    val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
     val primaryButtonBg = if (isDark) GoldTarget else NavyHero
     val primaryButtonContent = if (isDark) NavyHeroDark else Color.White
@@ -463,6 +467,14 @@ fun AddTransactionDialog(
                                     return@Button
                                 }
                                 errorMessage = null
+                                if (type == "out" && amountVal >= 500_000L) {
+                                    FinancialNotificationHelper.sendLargeExpenseNotification(
+                                        context = context,
+                                        description = descVal,
+                                        amount = amountVal,
+                                        account = selectedAccount
+                                    )
+                                }
                                 onSave(
                                     type,
                                     descVal,
@@ -523,13 +535,9 @@ fun AddTransactionDialog(
             accounts = accounts,
             onDismiss = { showScanReceipt = false },
             onConfirmExpense = { desc, amount, account, category, date ->
-                type = "out"
-                description = desc
-                rawAmount = Formatters.formatRupiah(amount).replace("Rp", "").trim()
-                selectedAccount = account
-                selectedCategory = category
-                selectedDate = date
+                onSave("out", desc, amount, account, category, date)
                 showScanReceipt = false
+                Toast.makeText(context, "Transaksi nota berhasil dicatat!", Toast.LENGTH_SHORT).show()
             }
         )
     }

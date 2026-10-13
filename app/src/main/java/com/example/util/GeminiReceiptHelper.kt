@@ -62,16 +62,14 @@ object GeminiReceiptHelper {
         // Step 2: Try Cloud Gemini Vision for rich AI extraction
         val safeBitmap = ReceiptScanner.loadSafeBitmap(context, imageUri, 1024)
         val rawApiKey = try { BuildConfig.GEMINI_API_KEY } catch (_: Exception) { "" }
-        val apiKey = if (rawApiKey.isNotBlank() && rawApiKey != "your_api_key_here") {
-            rawApiKey
-        } else {
-            FALLBACK_KEY
-        }
+        val hasValidUserKey = rawApiKey.isNotBlank() &&
+                rawApiKey != "your_api_key_here" &&
+                !rawApiKey.contains("AIzaSyCsoew3PclNgGAIY39MGpcY68B_rXPCj_c")
 
-        if (safeBitmap != null && apiKey.isNotBlank()) {
+        if (safeBitmap != null && hasValidUserKey) {
             for (model in FALLBACK_MODELS) {
                 try {
-                    val aiResult = callGeminiVision(apiKey, safeBitmap, ocrResult.rawText, model)
+                    val aiResult = callGeminiVision(rawApiKey, safeBitmap, ocrResult.rawText, model)
                     if (aiResult != null && (aiResult.amount > 0 || aiResult.merchant != "Nota Belanja")) {
                         // If AI detected 0 amount but local OCR found a positive amount, complement it!
                         val finalAmount = if (aiResult.amount > 0L) aiResult.amount else ocrResult.amount

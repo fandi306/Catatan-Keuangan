@@ -26,10 +26,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.ReceiptLong
@@ -75,6 +77,7 @@ import com.example.ui.auth.AuthManager
 import com.example.ui.auth.AuthScreen
 import com.example.ui.components.AddTransactionDialog
 import com.example.ui.screens.AnalyticsScreen
+import com.example.ui.screens.CurhatAiScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.TransactionsScreen
@@ -184,10 +187,12 @@ enum class NavItem(
     val title: String,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector,
-    val tag: String
+    val tag: String,
+    val isPrimaryTab: Boolean = true
 ) {
     HOME("Beranda", Icons.Filled.Home, Icons.Outlined.Home, "nav_home"),
     TRANSACTIONS("Transaksi", Icons.Filled.ReceiptLong, Icons.Outlined.ReceiptLong, "nav_transactions"),
+    CURHAT_AI("Curhat AI", Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome, "nav_curhat_ai", isPrimaryTab = false),
     ANALYTICS("Pencapaian", Icons.Filled.ShowChart, Icons.Outlined.ShowChart, "nav_analytics"),
     PROFILE("Profil", Icons.Filled.Person, Icons.Outlined.Person, "nav_profile")
 }
@@ -269,7 +274,7 @@ fun MainAppShell(
                     },
                     modifier = Modifier.testTag("navigation_rail")
                 ) {
-                    NavItem.entries.forEach { item ->
+                    NavItem.entries.filter { it.isPrimaryTab }.forEach { item ->
                         val isSelected = currentNav == item
                         NavigationRailItem(
                             selected = isSelected,
@@ -323,11 +328,16 @@ fun MainAppShell(
                                     onNavigateToProfile = { currentNav = NavItem.PROFILE },
                                     onNavigateToTransactions = { currentNav = NavItem.TRANSACTIONS },
                                     onNavigateToAnalytics = { currentNav = NavItem.ANALYTICS },
+                                    onNavigateToCurhatAi = { currentNav = NavItem.CURHAT_AI },
                                     onAddNewTransaction = { showAddTxDialog = true }
                                 )
                                 NavItem.TRANSACTIONS -> TransactionsScreen(
                                     viewModel = viewModel,
                                     onAddNewTransaction = { showAddTxDialog = true }
+                                )
+                                NavItem.CURHAT_AI -> CurhatAiScreen(
+                                    viewModel = viewModel,
+                                    onNavigateBack = { currentNav = NavItem.PROFILE }
                                 )
                                 NavItem.ANALYTICS -> AnalyticsScreen(
                                     viewModel = viewModel,
@@ -336,6 +346,7 @@ fun MainAppShell(
                                 NavItem.PROFILE -> ProfileScreen(
                                     viewModel = viewModel,
                                     onNavigateBack = { currentNav = NavItem.HOME },
+                                    onNavigateToCurhatAi = { currentNav = NavItem.CURHAT_AI },
                                     onSignedOut = onSignedOut
                                 )
                             }
@@ -381,7 +392,7 @@ fun MainAppShell(
                             .navigationBarsPadding()
                             .testTag("bottom_navigation_bar")
                     ) {
-                        NavItem.entries.forEach { item ->
+                        NavItem.entries.filter { it.isPrimaryTab }.forEach { item ->
                             val isSelected = currentNav == item
                             NavigationBarItem(
                                 selected = isSelected,
@@ -435,11 +446,16 @@ fun MainAppShell(
                                     onNavigateToProfile = { currentNav = NavItem.PROFILE },
                                     onNavigateToTransactions = { currentNav = NavItem.TRANSACTIONS },
                                     onNavigateToAnalytics = { currentNav = NavItem.ANALYTICS },
+                                    onNavigateToCurhatAi = { currentNav = NavItem.CURHAT_AI },
                                     onAddNewTransaction = { showAddTxDialog = true }
                                 )
                                 NavItem.TRANSACTIONS -> TransactionsScreen(
                                     viewModel = viewModel,
                                     onAddNewTransaction = { showAddTxDialog = true }
+                                )
+                                NavItem.CURHAT_AI -> CurhatAiScreen(
+                                    viewModel = viewModel,
+                                    onNavigateBack = { currentNav = NavItem.PROFILE }
                                 )
                                 NavItem.ANALYTICS -> AnalyticsScreen(
                                     viewModel = viewModel,
@@ -448,6 +464,7 @@ fun MainAppShell(
                                 NavItem.PROFILE -> ProfileScreen(
                                     viewModel = viewModel,
                                     onNavigateBack = { currentNav = NavItem.HOME },
+                                    onNavigateToCurhatAi = { currentNav = NavItem.CURHAT_AI },
                                     onSignedOut = onSignedOut
                                 )
                             }

@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DocumentScanner
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -52,11 +53,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Transaction
+import com.example.ui.components.ExportTransactionsDialog
 import com.example.ui.components.ScanReceiptDialog
 import com.example.ui.components.TransactionItem
 import com.example.ui.theme.ExpenseRed
@@ -72,15 +76,19 @@ fun TransactionsScreen(
     viewModel: FinanceViewModel,
     onAddNewTransaction: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val selectedMonth by viewModel.selectedMonth.collectAsState()
     val monthlyIncome by viewModel.monthlyIncome.collectAsState()
     val monthlyExpense by viewModel.monthlyExpense.collectAsState()
     val filterType by viewModel.filterType.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val transactions by viewModel.displayedTransactions.collectAsState()
+    val allTransactions by viewModel.transactions.collectAsState()
     val accounts by viewModel.accounts.collectAsState()
+    val userProfile by viewModel.userProfile.collectAsState()
 
     var showScanReceiptDialog by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }
 
     val isDark = isSystemInDarkTheme()
     val chipSelectedBg = if (isDark) GoldTarget else NavyHero
@@ -99,13 +107,13 @@ fun TransactionsScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp)
                 .testTag("transactions_screen")
         ) {
-            // Header Bar with Title, Scan Nota Button, and Month Navigation
+            // Header Bar with Title, Scan Nota Button, and Ekspor Button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Riwayat Transaksi",
                         style = MaterialTheme.typography.titleLarge,
@@ -121,9 +129,8 @@ fun TransactionsScreen(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    // Pindahkan tombol Scan Nota ke halaman transaksi sesuai permintaan pengguna
                     OutlinedButton(
                         onClick = { showScanReceiptDialog = true },
                         shape = RoundedCornerShape(99.dp),
@@ -139,112 +146,118 @@ fun TransactionsScreen(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Scan Nota",
+                            text = "Scan",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                    OutlinedButton(
+                        onClick = { showExportDialog = true },
+                        shape = RoundedCornerShape(99.dp),
                         modifier = Modifier
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                RoundedCornerShape(99.dp)
-                            )
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                            .height(36.dp)
+                            .testTag("btn_export_transactions")
                     ) {
-                        FilledIconButton(
-                            onClick = { viewModel.changeMonth(-1) },
-                            modifier = Modifier.size(28.dp),
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = MaterialTheme.colorScheme.onSurface
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                                contentDescription = "Bulan lalu"
-                            )
-                        }
-
-                        Text(
-                            text = Formatters.formatMonthYear(selectedMonth),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(horizontal = 6.dp)
+                        Icon(
+                            imageVector = Icons.Default.FileDownload,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = if (isDark) GoldTarget else NavyHero
                         )
-
-                        FilledIconButton(
-                            onClick = { viewModel.changeMonth(1) },
-                            modifier = Modifier.size(28.dp),
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = MaterialTheme.colorScheme.onSurface
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                contentDescription = "Bulan depan"
-                            )
-                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Ekspor",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) GoldTarget else NavyHero
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Mini Month Flow Badge
+            // Month Navigation & Flow Bar
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = IncomeGreen.copy(alpha = 0.1f),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Masuk",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = IncomeGreen
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            RoundedCornerShape(99.dp)
                         )
-                        Text(
-                            text = Formatters.formatRupiah(monthlyIncome),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = IncomeGreen
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                ) {
+                    FilledIconButton(
+                        onClick = { viewModel.changeMonth(-1) },
+                        modifier = Modifier.size(28.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                            contentDescription = "Bulan lalu"
+                        )
+                    }
+
+                    Text(
+                        text = Formatters.formatMonthYear(selectedMonth),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(horizontal = 6.dp)
+                    )
+
+                    FilledIconButton(
+                        onClick = { viewModel.changeMonth(1) },
+                        modifier = Modifier.size(28.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = "Bulan depan"
                         )
                     }
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = ExpenseRed.copy(alpha = 0.1f),
-                    modifier = Modifier.weight(1f)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = IncomeGreen.copy(alpha = 0.12f)
                     ) {
                         Text(
-                            text = "Keluar",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = ExpenseRed
-                        )
-                        Text(
-                            text = Formatters.formatRupiah(monthlyExpense),
+                            text = "+${Formatters.formatRupiah(monthlyIncome)}",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = ExpenseRed
+                            color = IncomeGreen,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = ExpenseRed.copy(alpha = 0.12f)
+                    ) {
+                        Text(
+                            text = "-${Formatters.formatRupiah(monthlyExpense)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = ExpenseRed,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
                         )
                     }
                 }
@@ -401,6 +414,21 @@ fun TransactionsScreen(
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text("Scan Nota AI")
                                 }
+
+                                if (allTransactions.isNotEmpty()) {
+                                    OutlinedButton(
+                                        onClick = { showExportDialog = true },
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.FileDownload,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Ekspor")
+                                    }
+                                }
                             }
                         }
                     }
@@ -416,7 +444,17 @@ fun TransactionsScreen(
             onConfirmExpense = { desc, amount, account, category, date ->
                 viewModel.addTransaction("out", desc, amount, account, category, date)
                 showScanReceiptDialog = false
+                Toast.makeText(context, "Transaksi nota berhasil dicatat!", Toast.LENGTH_SHORT).show()
             }
+        )
+    }
+
+    if (showExportDialog) {
+        ExportTransactionsDialog(
+            allTransactions = allTransactions,
+            currentMonth = selectedMonth,
+            userName = userProfile?.displayName ?: "",
+            onDismiss = { showExportDialog = false }
         )
     }
 }
