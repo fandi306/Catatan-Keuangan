@@ -119,8 +119,11 @@ object AuthManager {
                     onAuthError("Unexpected credential type")
                 }
             } catch (e: GetCredentialCancellationException) {
-                Log.w(TAG, "Google Sign-In flow cancelled or dismissed: ${e.message}", e)
+                Log.w(TAG, "Google Sign-In flow cancelled or dismissed: ${e.message}")
                 onAuthCancelled()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                Log.d(TAG, "Google Sign-In coroutine cancelled normally: ${e.message}")
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Google Sign-In failed", e)
                 onAuthError(e.localizedMessage ?: "Login dengan Google gagal.")

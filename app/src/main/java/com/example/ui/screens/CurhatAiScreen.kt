@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -75,7 +76,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Account
@@ -152,6 +159,7 @@ fun CurhatAiScreen(
 
     val quickPrompts = listOf(
         "Hari ini habis 1jt: 900k servis motor, 100k makan",
+        "Kutipan Islami tentang keuangan & rezeki",
         "Berapa sisa uang & pengeluaranku bulan ini?",
         "Lapar mata terus belanja, gimana cara ngeremnya?",
         "Pos apa yang paling boros bulan ini?",
@@ -205,7 +213,9 @@ fun CurhatAiScreen(
             Surface(
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 2.dp,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
@@ -337,191 +347,239 @@ fun CurhatAiScreen(
                     }
                 }
             }
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .imePadding()
-        ) {
-            // Chat list
-            LazyColumn(
-                state = listState,
+        },
+        bottomBar = {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
                 modifier = Modifier
-                    .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                contentPadding = PaddingValues(vertical = 12.dp)
+                    .navigationBarsPadding()
+                    .imePadding()
             ) {
-                items(messages, key = { it.id }) { message ->
-                    if (message.isUser) {
-                        UserMessageBubble(message = message, isDark = isDark)
-                    } else {
-                        BotMessageBubble(
-                            message = message,
-                            accounts = accounts,
-                            isDark = isDark,
-                            onRecordTransactions = { proposedList, selectedAccountName ->
-                                val total = proposedList.sumOf { it.amount }
-                                proposedList.forEach { p ->
-                                    viewModel.addTransaction(
-                                        type = p.type,
-                                        description = p.description,
-                                        amount = p.amount,
-                                        account = selectedAccountName,
-                                        category = p.category,
-                                        date = p.date
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Quick suggestion prompts
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(quickPrompts) { prompt ->
+                            FilterChip(
+                                selected = false,
+                                onClick = { sendUserMessage(prompt) },
+                                label = {
+                                    Text(
+                                        text = prompt,
+                                        style = MaterialTheme.typography.labelSmall
                                     )
-                                }
-
-                                // Update local message state to recorded
-                                val idx = messages.indexOfFirst { it.id == message.id }
-                                if (idx != -1) {
-                                    messages[idx] = messages[idx].copy(isRecorded = true)
-                                }
-
-                                // Post system notification in Android Control Center
-                                FinancialNotificationHelper.sendAiSyncSuccessNotification(
-                                    context = context,
-                                    count = proposedList.size,
-                                    totalAmount = total,
-                                    account = selectedAccountName
-                                )
-
-                                // Check if large expense alert should also fire
-                                if (total >= 500_000L) {
-                                    FinancialNotificationHelper.sendLargeExpenseNotification(
-                                        context = context,
-                                        description = proposedList.firstOrNull()?.description ?: "Pengeluaran Curhat",
-                                        amount = total,
-                                        account = selectedAccountName
-                                    )
-                                }
-
-                                Toast.makeText(
-                                    context,
-                                    "✓ ${proposedList.size} Transaksi berhasil dicatat ke akun $selectedAccountName!",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
-                        )
-                    }
-                }
-
-                if (isLoading) {
-                    item {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                .padding(horizontal = 14.dp, vertical = 10.dp)
-                        ) {
-                            CircularProgressIndicator(
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(16.dp),
-                                color = GoldTarget
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                                ),
+                                shape = RoundedCornerShape(20.dp)
                             )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "Finansia sedang memikirkan solusi & menganalisis catatanmu...",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    }
+
+                    // Message Input bar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = inputText,
+                            onValueChange = { inputText = it },
+                            placeholder = {
+                                Text(
+                                    "Curhat atau sebutkan pengeluaran...",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("input_curhat_text"),
+                            shape = RoundedCornerShape(24.dp),
+                            maxLines = 3,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = GoldTarget,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        IconButton(
+                            onClick = { sendUserMessage(inputText) },
+                            enabled = inputText.isNotBlank() && !isLoading,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (inputText.isNotBlank() && !isLoading) {
+                                        if (isDark) GoldTarget else NavyHero
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant
+                                    }
+                                )
+                                .testTag("btn_send_curhat")
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Kirim",
+                                tint = if (inputText.isNotBlank() && !isLoading) {
+                                    if (isDark) NavyHeroDark else Color.White
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                },
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
                 }
             }
+        }
+    ) { paddingValues ->
+        // Chat list
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(vertical = 12.dp)
+        ) {
+            items(messages, key = { it.id }) { message ->
+                if (message.isUser) {
+                    UserMessageBubble(message = message, isDark = isDark)
+                } else {
+                    BotMessageBubble(
+                        message = message,
+                        accounts = accounts,
+                        isDark = isDark,
+                        onRecordTransactions = { proposedList, selectedAccountName ->
+                            val total = proposedList.sumOf { it.amount }
+                            proposedList.forEach { p ->
+                                viewModel.addTransaction(
+                                    type = p.type,
+                                    description = p.description,
+                                    amount = p.amount,
+                                    account = selectedAccountName,
+                                    category = p.category,
+                                    date = p.date
+                                )
+                            }
 
-            // Quick suggestion prompts
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(quickPrompts) { prompt ->
-                    FilterChip(
-                        selected = false,
-                        onClick = { sendUserMessage(prompt) },
-                        label = {
-                            Text(
-                                text = prompt,
-                                style = MaterialTheme.typography.labelSmall
+                            // Update local message state to recorded
+                            val idx = messages.indexOfFirst { it.id == message.id }
+                            if (idx != -1) {
+                                messages[idx] = messages[idx].copy(isRecorded = true)
+                            }
+
+                            // Post system notification in Android Control Center
+                            FinancialNotificationHelper.sendAiSyncSuccessNotification(
+                                context = context,
+                                count = proposedList.size,
+                                totalAmount = total,
+                                account = selectedAccountName
                             )
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-                        ),
-                        shape = RoundedCornerShape(20.dp)
+
+                            // Check if large expense alert should also fire
+                            if (total >= 500_000L) {
+                                FinancialNotificationHelper.sendLargeExpenseNotification(
+                                    context = context,
+                                    description = proposedList.firstOrNull()?.description ?: "Pengeluaran Curhat",
+                                    amount = total,
+                                    account = selectedAccountName
+                                )
+                            }
+
+                            Toast.makeText(
+                                context,
+                                "✓ ${proposedList.size} Transaksi berhasil dicatat ke akun $selectedAccountName!",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
                     )
                 }
             }
 
-            // Message Input bar
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 6.dp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = inputText,
-                        onValueChange = { inputText = it },
-                        placeholder = {
-                            Text(
-                                "Curhat atau sebutkan pengeluaran...",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        },
+            if (isLoading) {
+                item {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
-                            .weight(1f)
-                            .testTag("input_curhat_text"),
-                        shape = RoundedCornerShape(24.dp),
-                        maxLines = 3,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GoldTarget,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    IconButton(
-                        onClick = { sendUserMessage(inputText) },
-                        enabled = inputText.isNotBlank() && !isLoading,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (inputText.isNotBlank() && !isLoading) {
-                                    if (isDark) GoldTarget else NavyHero
-                                } else {
-                                    MaterialTheme.colorScheme.surfaceVariant
-                                }
-                            )
-                            .testTag("btn_send_curhat")
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
                     ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Kirim",
-                            tint = if (inputText.isNotBlank() && !isLoading) {
-                                if (isDark) NavyHeroDark else Color.White
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                            },
-                            modifier = Modifier.size(20.dp)
+                        CircularProgressIndicator(
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(16.dp),
+                            color = GoldTarget
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Finansia sedang memikirkan solusi & menganalisis catatanmu...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
+        }
+    }
+}
+
+fun formatChatMarkdown(content: String): AnnotatedString {
+    return buildAnnotatedString {
+        // Regex matches:
+        // ***bold italic***
+        // **bold**
+        // *italic*
+        // `inline code`
+        val pattern = Regex("""(\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)""")
+        var cursor = 0
+        for (match in pattern.findAll(content)) {
+            val start = match.range.first
+            val end = match.range.last + 1
+            if (start > cursor) {
+                append(content.substring(cursor, start))
+            }
+            val matchText = match.value
+            when {
+                matchText.startsWith("***") && matchText.endsWith("***") && matchText.length >= 6 -> {
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontStyle = FontStyle.Italic)) {
+                        append(matchText.substring(3, matchText.length - 3))
+                    }
+                }
+                matchText.startsWith("**") && matchText.endsWith("**") && matchText.length >= 4 -> {
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append(matchText.substring(2, matchText.length - 2))
+                    }
+                }
+                matchText.startsWith("*") && matchText.endsWith("*") && matchText.length >= 2 -> {
+                    withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
+                        append(matchText.substring(1, matchText.length - 1))
+                    }
+                }
+                matchText.startsWith("`") && matchText.endsWith("`") && matchText.length >= 2 -> {
+                    withStyle(SpanStyle(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold)) {
+                        append(matchText.substring(1, matchText.length - 1))
+                    }
+                }
+                else -> {
+                    append(matchText)
+                }
+            }
+            cursor = end
+        }
+        if (cursor < content.length) {
+            append(content.substring(cursor))
         }
     }
 }
@@ -550,7 +608,7 @@ fun UserMessageBubble(
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Text(
-                text = message.text,
+                text = formatChatMarkdown(message.text),
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (isDark) NavyHeroDark else Color.White
             )
@@ -601,7 +659,7 @@ fun BotMessageBubble(
                     .padding(horizontal = 14.dp, vertical = 11.dp)
             ) {
                 Text(
-                    text = message.text,
+                    text = formatChatMarkdown(message.text),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )

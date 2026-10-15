@@ -18,9 +18,50 @@ data class ReleaseNote(
 object ReleaseNotesData {
     val NOTES = listOf(
         ReleaseNote(
+            version = "1.1.1",
+            releaseDate = "15 Oktober 2026",
+            isLatest = true,
+            title = "Pembaruan v1.1.1 Beta: Format Bold Chatbot, Percakapan Alami & Kutipan Islami",
+            highlights = listOf(
+                "Dukungan format teks tebal (bold) otomatis di bubble chat Curhat AI tanpa tanda bintang (*).",
+                "Kecerdasan emosional Curhat AI: kini nyaman diajak bercerita, curhat lelah kerja, dilema utang, dan belanja.",
+                "Tampilan input pesan mulus tepat di atas keyboard tanpa kotak hitam atau celah kosong.",
+                "Koleksi mutiara finansial Islami dari Al-Qur'an dan Hadits seputar rezeki halal, qana'ah, dan berkah sedekah."
+            ),
+            categories = listOf(
+                ReleaseCategory(
+                    title = "Curhat AI & Percakapan Alami",
+                    emoji = "🤖",
+                    items = listOf(
+                        "Dukungan styling Markdown: teks **tebal** otomatis tampil menggunakan font bold yang rapi tanpa tanda bintang.",
+                        "Empati mendalam: Finansia kini merespons curhat lelah bekerja, rasa sesal setelah belanja, minder dengan pencapaian teman, dan dilema pinjam-meminjam uang.",
+                        "Penambahan respon cerdas untuk pembagian gaji (metode 50-30-20), pertimbangan membeli barang impian, dan tips bertahan saat saldo menipis.",
+                        "Integrasi kutipan inspiratif dari Al-Qur'an (QS. Al-Furqan 67, Al-Isra 26-27, At-Talaq 2-3, Al-Baqarah 261) dan Hadits shahih tentang keberkahan harta."
+                    )
+                ),
+                ReleaseCategory(
+                    title = "Perbaikan Antarmuka & Keyboard",
+                    emoji = "📱",
+                    items = listOf(
+                        "Menghilangkan kotak hitam dan double insets di atas keyboard saat mengetik pesan di Curhat AI.",
+                        "Kolom input pesan dan tombol kirim otomatis terpasang presisi tepat di atas keyboard ponsel.",
+                        "Layar Curhat AI kini beroperasi mandiri dari Profil tanpa tumpang tindih dengan navigasi bawah."
+                    )
+                ),
+                ReleaseCategory(
+                    title = "Peningkatan Sistem & Rilis",
+                    emoji = "⚡",
+                    items = listOf(
+                        "Penanganan coroutine cancellation pada login Google agar tidak menimbulkan notifikasi error palsu.",
+                        "Pembaruan versi rilis resmi menjadi v1.1.1 Beta."
+                    )
+                )
+            )
+        ),
+        ReleaseNote(
             version = "1.1.0",
             releaseDate = "13 Oktober 2026",
-            isLatest = true,
+            isLatest = false,
             title = "Pembaruan Besar: Ekspor Finansial, Smart OCR Nota & Catatan Rilis",
             highlights = listOf(
                 "Ekspor Catatan Finansial lengkap ke PDF & Excel/CSV yang elegan dan rapi.",

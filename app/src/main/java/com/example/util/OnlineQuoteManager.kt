@@ -26,6 +26,126 @@ object OnlineQuoteManager {
     // Koleksi masif 50+ kutipan finansial dan kebijaksanaan terkurasi
     val CURATED_QUOTES = listOf(
         FinancialQuote(
+            quote = "Dan orang-orang yang apabila membelanjakan (harta), mereka tidak berlebihan, dan tidak (pula) kikir, di antara keduanya secara wajar.",
+            author = "QS. Al-Furqan: 67",
+            category = "OJK_FORMULA",
+            tip = "Prinsip washatiyah (keseimbangan): kelola anggaran agar tidak berlebihan melampaui kemampuan dan tidak pula kikir."
+        ),
+        FinancialQuote(
+            quote = "Dan janganlah kamu menghambur-hamburkan (hartamu) secara boros. Sesungguhnya para pemboros itu adalah saudara-saudara setan.",
+            author = "QS. Al-Isra': 26-27",
+            category = "GENERAL",
+            tip = "Jauhi belanja impulsif dan lapar mata; dahulukan kebutuhan primer daripada sekadar gengsi."
+        ),
+        FinancialQuote(
+            quote = "Bukanlah kekayaan itu dengan banyaknya harta benda, melainkan kekayaan yang sejati adalah kekayaan jiwa (hati yang qana'ah).",
+            author = "HR. Bukhari no. 6446 & Muslim no. 1051",
+            category = "GENERAL",
+            tip = "Kekayaan hakiki terletak pada rasa cukup dan bersyukur, bukan perlombaan gaya hidup."
+        ),
+        FinancialQuote(
+            quote = "Sesungguhnya jika kamu bersyukur, niscaya Aku akan menambah (nikmat) kepadamu.",
+            author = "QS. Ibrahim: 7",
+            category = "TARGET_ACHIEVED",
+            tip = "Syukuri setiap rezeki dengan mencatatnya rapi dan membaginya dengan bijak."
+        ),
+        FinancialQuote(
+            quote = "Tangan yang di atas (memberi) lebih baik daripada tangan yang di bawah. Dan mulailah dari orang yang menjadi tanggunganmu.",
+            author = "HR. Bukhari no. 1429",
+            category = "OJK_FORMULA",
+            tip = "Sisihkan porsi sedekah dan nafkah keluarga; sedekah tidak akan mengurangi berkah harta."
+        ),
+        FinancialQuote(
+            quote = "Ikatlah untamu terlebih dahulu, kemudian bertawakkallah kepada Allah.",
+            author = "HR. Tirmidzi no. 2517",
+            category = "SAVING",
+            tip = "Mencatat anggaran dan menyiapkan dana darurat adalah ikhtiar nyata sebelum berserah diri."
+        ),
+        FinancialQuote(
+            quote = "Barangsiapa berutang dengan niat sungguh-sungguh untuk melunasinya, niscaya Allah akan memudahkannya.",
+            author = "HR. Bukhari no. 2387",
+            category = "OJK_FORMULA",
+            tip = "Jaga cicilan maksimal 30% dari pemasukan dan prioritaskan pelunasan utang agar hidup tenang."
+        ),
+        FinancialQuote(
+            quote = "Wahai orang-orang yang beriman! Apabila kamu bermuamalah tidak secara tunai, hendaklah kamu menuliskannya.",
+            author = "QS. Al-Baqarah: 282",
+            category = "GENERAL",
+            tip = "Mencatat transaksi dan piutang secara teratur adalah perintah langsung Al-Qur'an untuk menjaga amanah."
+        ),
+        FinancialQuote(
+            quote = "Harta tidak akan berkurang karena sedekah, dan Allah tidak menambah bagi orang yang memaafkan melainkan kemuliaan.",
+            author = "HR. Muslim no. 2588",
+            category = "SAVING",
+            tip = "Sedekah membuka pintu keberkahan rezeki yang tak terduga."
+        ),
+        FinancialQuote(
+            quote = "Barangsiapa bertakwa kepada Allah niscaya Dia akan membukakan jalan keluar baginya, dan memberinya rezeki dari arah yang tiada disangka-sangkanya.",
+            author = "QS. At-Talaq: 2-3",
+            category = "GENERAL",
+            tip = "Ketakwaan dan tawakkal yang sungguh-sungguh adalah kunci terbukanya rezeki halal yang tak terduga."
+        ),
+        FinancialQuote(
+            quote = "Perumpamaan orang yang menginfakkan hartanya di jalan Allah seperti sebutir biji yang menumbuhkan tujuh tangkai, pada setiap tangkai ada seratus biji.",
+            author = "QS. Al-Baqarah: 261",
+            category = "OJK_FORMULA",
+            tip = "Berbagi dan bersedekah melipatgandakan nilai dan keberkahan setiap rupiah yang kita miliki."
+        ),
+        FinancialQuote(
+            quote = "Sungguh beruntung orang yang masuk Islam, diberi rezeki yang mencukupi, dan Allah menjadikannya qana'ah (merasa cukup) atas apa yang diberikan.",
+            author = "HR. Muslim no. 1054",
+            category = "SAVING",
+            tip = "Sifat qana'ah melindungi diri dari perlombaan gengsi duniawi dan gaya hidup konsumtif."
+        ),
+        FinancialQuote(
+            quote = "Makan dan minumlah, tetapi janganlah berlebih-lebihan. Sesungguhnya Allah tidak menyukai orang-orang yang berlebih-lebihan.",
+            author = "QS. Al-A'raf: 31",
+            category = "DEFICIT",
+            tip = "Hindari perilaku israf (boros melampaui batas); belanjalah sesuai kebutuhan, bukan sekadar lapar mata."
+        ),
+        FinancialQuote(
+            quote = "Seandainya kalian bertawakkal kepada Allah dengan sebenar-benar tawakkal, niscaya kalian diberi rezeki sebagaimana burung: pergi pagi lapar, pulang petang kenyang.",
+            author = "HR. Tirmidzi no. 2344",
+            category = "GENERAL",
+            tip = "Ikhtiar bekerja setiap hari dengan hati yang tenang dan berserah diri kepada Sang Pemberi Rezeki."
+        ),
+        FinancialQuote(
+            quote = "Tidak akan bergeser kedua kaki seorang hamba pada hari kiamat hingga ditanya tentang hartanya: dari mana ia peroleh dan ke mana ia belanjakan.",
+            author = "HR. Tirmidzi no. 2417",
+            category = "OJK_FORMULA",
+            tip = "Mencatat setiap pengeluaran dan memastikan sumber halal adalah bentuk amanah menjaga titipan rezeki."
+        ),
+        FinancialQuote(
+            quote = "Pedagang yang jujur dan dapat dipercaya akan bersama para nabi, orang-orang yang benar (shiddiqin), dan para syuhada.",
+            author = "HR. Tirmidzi no. 1209 & Bukhari",
+            category = "TARGET_ACHIEVED",
+            tip = "Kejujuran dalam mencari nafkah dan berbisnis membawa berkah dan ketenangan batin yang abadi."
+        ),
+        FinancialQuote(
+            quote = "Manfaatkan lima perkara sebelum lima perkara: waktu mudamu sebelum tuamu, sehatmu sebelum sakitmu, kayamu sebelum miskinmu, luangmu sebelum sempitmu, dan hidupmu sebelum matimu.",
+            author = "HR. Al-Hakim no. 7846 (Shahih)",
+            category = "SAVING",
+            tip = "Persiapkan dana darurat dan tabungan masa depan selagi masih sehat, produktif, dan memiliki penghasilan."
+        ),
+        FinancialQuote(
+            quote = "Lihatlah orang yang berada di bawahmu (dalam urusan dunia/harta) dan jangan melihat orang yang berada di atasmu, agar kamu tidak meremehkan nikmat Allah.",
+            author = "HR. Muslim no. 2564",
+            category = "GENERAL",
+            tip = "Fokus pada rasa syukur atas rezeki diri sendiri, bukan membandingkan gaya hidup dengan orang lain di media sosial."
+        ),
+        FinancialQuote(
+            quote = "Sesungguhnya Allah tidak akan mengubah keadaan suatu kaum sebelum mereka mengubah keadaan diri mereka sendiri.",
+            author = "QS. Ar-Ra'd: 11",
+            category = "TARGET_NEAR",
+            tip = "Perbaikan kondisi keuangan dimulai dari kemauan diri sendiri untuk disiplin mencatat dan mengendalikan pengeluaran harian."
+        ),
+        FinancialQuote(
+            quote = "Menunda-nunda pembayaran utang bagi orang yang mampu adalah suatu kezaliman.",
+            author = "HR. Bukhari no. 2408 & Muslim no. 1628",
+            category = "OJK_FORMULA",
+            tip = "Segera lunasi utang dan tagihan begitu memiliki uang; jangan tunda hak orang lain agar rezeki tetap lapang."
+        ),
+        FinancialQuote(
             quote = "Jangan menabung apa yang tersisa setelah dibelanjakan, tapi belanjakan apa yang tersisa setelah menabung.",
             author = "Warren Buffett",
             category = "SAVING",

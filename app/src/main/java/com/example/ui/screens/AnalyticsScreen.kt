@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.OjkBudgetFormulaCard
@@ -298,6 +299,7 @@ fun AnalyticsScreen(
                         }
 
                         if (isReached) {
+                            Spacer(modifier = Modifier.width(6.dp))
                             Surface(
                                 shape = RoundedCornerShape(99.dp),
                                 color = IncomeGreen.copy(alpha = 0.12f)
@@ -307,6 +309,8 @@ fun AnalyticsScreen(
                                     color = IncomeGreen,
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                 )
                             }
@@ -377,9 +381,13 @@ fun AnalyticsScreen(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
                         Box(
                             modifier = Modifier
                                 .size(10.dp)
@@ -401,11 +409,14 @@ fun AnalyticsScreen(
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = Formatters.formatRupiah(liquidAsset),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
 
@@ -416,7 +427,10 @@ fun AnalyticsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
                         Box(
                             modifier = Modifier
                                 .size(10.dp)
@@ -432,17 +446,20 @@ fun AnalyticsScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Handphone, emas, barang berharga, aset fisik, dll.",
+                                text = "Handphone, emas, barang berharga, dll.",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = Formatters.formatRupiah(nonLiquidAsset),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
             }
@@ -510,7 +527,10 @@ fun AnalyticsScreen(
                                 text = Formatters.formatRupiah(monthlyNet),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = if (monthlyNet >= 0) IncomeGreen else ExpenseRed
+                                color = if (monthlyNet >= 0) IncomeGreen else ExpenseRed,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                softWrap = false
                             )
                         }
                     }

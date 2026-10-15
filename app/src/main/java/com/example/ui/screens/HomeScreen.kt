@@ -886,7 +886,9 @@ fun CurhatAiBannerCard(
                         text = "Curhat Finansial ke AI",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f, fill = false),
+                        maxLines = 1
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Surface(
@@ -898,6 +900,8 @@ fun CurhatAiBannerCard(
                             style = MaterialTheme.typography.labelSmall,
                             color = IncomeGreen,
                             fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }

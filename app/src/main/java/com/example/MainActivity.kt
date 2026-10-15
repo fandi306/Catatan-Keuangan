@@ -355,12 +355,18 @@ fun MainAppShell(
                 }
             }
         } else {
-            // Phone Layout: Bottom Navigation Bar + Extended FAB
-            Scaffold(
-                modifier = Modifier.fillMaxSize(),
-                snackbarHost = { SnackbarHost(snackbarHostState) },
-                floatingActionButton = {
-                    if (currentNav == NavItem.HOME || currentNav == NavItem.TRANSACTIONS) {
+            // Phone Layout
+            if (currentNav == NavItem.CURHAT_AI) {
+                CurhatAiScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = { currentNav = NavItem.PROFILE }
+                )
+            } else {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    snackbarHost = { SnackbarHost(snackbarHostState) },
+                    floatingActionButton = {
+                        if (currentNav == NavItem.HOME || currentNav == NavItem.TRANSACTIONS) {
                         ExtendedFloatingActionButton(
                             onClick = { showAddTxDialog = true },
                             containerColor = primaryActionBg,
@@ -473,6 +479,7 @@ fun MainAppShell(
                 }
             }
         }
+    }
     }
 
     if (showAddTxDialog) {

@@ -540,7 +540,7 @@ fun ProfileScreen(
                             )
                         }
                         Text(
-                            text = "Informasi & Kontak · V1.1.0 Beta tester",
+                            text = "Informasi & Kontak · v1.1.1 Beta",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -601,12 +601,18 @@ fun ProfileScreen(
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
                                 Text(
-                                    text = "Curhat & Asisten Finansia AI",
+                                    text = "Curhat & Asisten AI",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Surface(
@@ -618,13 +624,15 @@ fun ProfileScreen(
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = if (isDark) GoldTarget else NavyHero,
+                                        maxLines = 1,
+                                        softWrap = false,
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                     )
                                 }
                             }
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Tersambung ke data finansial, deteksi transaksi otomatis & saran berhemat",
+                                text = "Konsultasi finansial & saran berhemat cerdas",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1675,7 +1683,7 @@ fun ProfileScreen(
                             color = (if (isDark) GoldTarget else NavyHero).copy(alpha = 0.12f)
                         ) {
                             Text(
-                                text = "V1.1.0 Beta tester",
+                                text = "v1.1.1 Beta",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isDark) GoldTarget else NavyHero,
